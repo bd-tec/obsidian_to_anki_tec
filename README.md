@@ -173,14 +173,18 @@ Enhances the display of Anki clozes (`{{c1::answer::hint}}`) in Obsidian's Readi
   - **Render**: Displays `{{c1::answer::hint}}` as `answer`.
   - **Highlight**: If enabled, the answer text is highlighted using Obsidian's default highlight style (`<mark>`). This setting appears as "**Highlight Rendered Clozes**" when the main toggle is ON.
 
-### Cloze Deletion Context Menu (Experimental)
+### Cloze Deletion Context Menu & Hotkeys (Experimental)
 
-Adds a context menu item to easily create Anki clozes from selected text in the editor.
+Adds context menu items and commands to easily create or remove Anki clozes from selected text in the editor.
 
-- **Enable**: Go to Settings -> Advanced -> Experimental Features and toggle "**Cloze Deletion Context Menu**".
+- **Enable Context Menu**: Go to Settings -> Advanced -> Experimental Features and toggle "**Cloze Deletion Context Menu**".
+- **Commands**:
+  - `Add Anki Cloze`: Converts selected text to `{{c<N>::text}}`.
+  - `Remove Anki Cloze`: Removes the cloze syntax, leaving only the text.
+  - *Note: Commands are available globally and can be assigned to hotkeys in Obsidian settings, regardless of the context menu toggle.*
 - **Usage**:
   1. Select text in the editor.
-  2. Right-click and choose "**Anki Cloze**".
+  2. Right-click and choose "**Anki Cloze**", or use your assigned hotkey.
   3. The text is converted to `{{c<N>::text}}`.
   4. The cloze number `<N>` is automatically calculated to fill gaps or increment from the highest existing number.
 
