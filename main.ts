@@ -562,6 +562,35 @@ export default class MyPlugin extends Plugin {
 			}
 		})
 
+		this.addCommand({
+			id: 'anki-cloze-add',
+			name: 'Add Anki Cloze',
+			editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+				const selection = editor.getSelection();
+				if (selection && !this.checkClozeContext(editor)) {
+					if (!checking) {
+						this.applyCloze(editor, selection);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		this.addCommand({
+			id: 'anki-cloze-remove',
+			name: 'Remove Anki Cloze',
+			editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => {
+				if (this.checkClozeContext(editor)) {
+					if (!checking) {
+						this.removeCloze(editor);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
 		// Context menu for files
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu: Menu, file: TAbstractFile) => {
