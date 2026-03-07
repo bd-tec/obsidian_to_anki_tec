@@ -7,7 +7,7 @@ import { FolderSuggestModal, getAllFolders } from './ui/FolderSuggester'
 const defaultDescs = {
 	"Scan Directory": "The directory to scan. Leave empty to scan the entire vault",
 	"Scan Tags": "The tags to scan. Leave empty to scan all files. Separate multiple tags with commas.",
-	"Tag": "The tag(s) that the plugin automatically adds to any generated cards. Separate multiple tags with commas.",
+	"Default Tags": "The tag(s) that the plugin automatically adds to any generated cards. Separate multiple tags with commas.",
 	"Deck": "The deck the plugin adds cards to if TARGET DECK is not specified in the file.",
 	"Scheduling Interval": "The time, in minutes, between automatic scans of the vault. Set this to 0 to disable automatic scanning.",
 	"Add File Link": "Append a link to the file that generated the flashcard on the field specified in the table.",
@@ -18,9 +18,9 @@ const defaultDescs = {
 	"CurlyCloze - Keyword": "The keyword to trigger CurlyCloze on note types.",
 	"CurlyCloze - Highlights to Clozes": "Convert ==highlights== -> {highlights} to be processed by CurlyCloze.",
 	"ID Comments": "Wrap note IDs in a HTML comment.",
-	"Add Obsidian Tags": "Interpret #tags in the fields of a note as Anki tags, removing them from the note text in Anki.",
-	"Add Obsidian YAML Tags": "Send tags defined in YAML frontmatter to Anki.",
-	"Format Obsidian Tags as Anki Hierarchical Tags": "Convert slash-separated Obsidian tags (e.g., #foo/bar) to Anki's hierarchical format (foo::bar). Applies to inline tags and YAML frontmatter tags.",
+	"Add Inline Tags": "Convert #tags in note fields to Anki tags. The #tags will be removed from the card text.",
+	"Add Frontmatter Tags": "Send tags from YAML frontmatter (the `tags:` section at the top of the file) to Anki.",
+	"Convert to Anki Hierarchy": "Convert slash-separated Obsidian tags (e.g., #foo/bar) to Anki's hierarchical format (foo::bar). Applies to inline tags and YAML frontmatter tags.",
 	"Smart Scan": "Skip files that haven't changed since the last scan (based on MD5 hash). Disable to force a full scan.",
 	"Bulk Delete IDs": "Enables 'Delete all IDs in file' menu. Deletes Anki notes for IDs found in the selected file and removes the IDs.",
 	"Save Note ID to Frontmatter": "Save the Anki Note ID (nid) to the YAML frontmatter instead of an inline comment. Applies ONLY to files that correspond to a single Anki note. Multiple notes in a file will still use inline IDs.",
@@ -159,21 +159,49 @@ export class SettingsTab extends PluginSettingTab {
 			plugin.settings["Defaults"]["CurlyCloze - Highlights to Clozes"] = false
 		}
 
-		if (!(plugin.settings["Defaults"].hasOwnProperty("Add Obsidian Tags"))) {
-			plugin.settings["Defaults"]["Add Obsidian Tags"] = false
+		// Migration: Add Obsidian Tags -> Add Inline Tags
+		if (plugin.settings["Defaults"].hasOwnProperty("Add Obsidian Tags")) {
+			plugin.settings["Defaults"]["Add Inline Tags"] = plugin.settings["Defaults"]["Add Obsidian Tags"]
+			delete plugin.settings["Defaults"]["Add Obsidian Tags"]
 		}
-		if (!(plugin.settings["Defaults"].hasOwnProperty("Format Obsidian Tags as Anki Hierarchical Tags"))) {
-			plugin.settings["Defaults"]["Format Obsidian Tags as Anki Hierarchical Tags"] = true
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Add Inline Tags"))) {
+			plugin.settings["Defaults"]["Add Inline Tags"] = false
 		}
+
+		// Migration: Tag -> Default Tags
+		if (plugin.settings["Defaults"].hasOwnProperty("Tag")) {
+			plugin.settings["Defaults"]["Default Tags"] = plugin.settings["Defaults"]["Tag"]
+			delete plugin.settings["Defaults"]["Tag"]
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Default Tags"))) {
+			plugin.settings["Defaults"]["Default Tags"] = "Obsidian_to_Anki"
+		}
+
+		// Migration: Format Obsidian Tags as Anki Hierarchical Tags -> Convert to Anki Hierarchy
+		if (plugin.settings["Defaults"].hasOwnProperty("Format Obsidian Tags as Anki Hierarchical Tags")) {
+			plugin.settings["Defaults"]["Convert to Anki Hierarchy"] = plugin.settings["Defaults"]["Format Obsidian Tags as Anki Hierarchical Tags"]
+			delete plugin.settings["Defaults"]["Format Obsidian Tags as Anki Hierarchical Tags"]
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Convert to Anki Hierarchy"))) {
+			plugin.settings["Defaults"]["Convert to Anki Hierarchy"] = true
+		}
+
 		if (!(plugin.settings["Defaults"].hasOwnProperty("CurlyCloze - Keyword"))) {
 			plugin.settings["Defaults"]["CurlyCloze - Keyword"] = "Cloze"
 		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Smart Scan"))) {
 			plugin.settings["Defaults"]["Smart Scan"] = true
 		}
-		if (!(plugin.settings["Defaults"].hasOwnProperty("Add Obsidian YAML Tags"))) {
-			plugin.settings["Defaults"]["Add Obsidian YAML Tags"] = false
+
+		// Migration: Add Obsidian YAML Tags -> Add Frontmatter Tags
+		if (plugin.settings["Defaults"].hasOwnProperty("Add Obsidian YAML Tags")) {
+			plugin.settings["Defaults"]["Add Frontmatter Tags"] = plugin.settings["Defaults"]["Add Obsidian YAML Tags"]
+			delete plugin.settings["Defaults"]["Add Obsidian YAML Tags"]
 		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Add Frontmatter Tags"))) {
+			plugin.settings["Defaults"]["Add Frontmatter Tags"] = false
+		}
+
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Bulk Delete IDs"))) {
 			plugin.settings["Defaults"]["Bulk Delete IDs"] = false
 		}
@@ -205,10 +233,10 @@ export class SettingsTab extends PluginSettingTab {
 			// Skip Scan Directory (already added above), tag settings (handled in addTagSettings), and other special settings
 			if (key === "Scan Directory" ||
 				key === "Scan Tags" ||
-				key === "Tag" ||
-				key === "Add Obsidian Tags" ||
-				key === "Add Obsidian YAML Tags" ||
-				key === "Format Obsidian Tags as Anki Hierarchical Tags" ||
+				key === "Default Tags" ||
+				key === "Add Inline Tags" ||
+				key === "Add Frontmatter Tags" ||
+				key === "Convert to Anki Hierarchy" ||
 				key === "Regex" ||
 				key === "Bulk Delete IDs" ||
 				key === "Regex Required Tags" ||
@@ -341,50 +369,50 @@ export class SettingsTab extends PluginSettingTab {
 					plugin.saveAllData()
 				}))
 
-		// Default Tag
+		// Default Tags
 		new Setting(container)
-			.setName('Tag')
-			.setDesc(defaultDescs['Tag'])
+			.setName('Default Tags')
+			.setDesc(defaultDescs['Default Tags'])
 			.addText(text => text
 				.setPlaceholder('tag1, tag2')
-				.setValue(plugin.settings.Defaults["Tag"] || '')
+				.setValue(plugin.settings.Defaults["Default Tags"] || '')
 				.onChange((value) => {
-					plugin.settings.Defaults["Tag"] = value
+					plugin.settings.Defaults["Default Tags"] = value
 					plugin.saveAllData()
 				}))
 
-		// Add Obsidian Tags
+		// Add Inline Tags
 		new Setting(container)
-			.setName("Add Obsidian Tags")
-			.setDesc(defaultDescs["Add Obsidian Tags"])
+			.setName("Add Inline Tags")
+			.setDesc(defaultDescs["Add Inline Tags"])
 			.addToggle(toggle => toggle
-				.setValue(plugin.settings.Defaults["Add Obsidian Tags"])
+				.setValue(plugin.settings.Defaults["Add Inline Tags"])
 				.onChange((value) => {
-					plugin.settings.Defaults["Add Obsidian Tags"] = value
+					plugin.settings.Defaults["Add Inline Tags"] = value
 					plugin.saveAllData()
 				})
 			)
 
-		// Add Obsidian YAML Tags
+		// Add Frontmatter Tags
 		new Setting(container)
-			.setName("Add Obsidian YAML Tags")
-			.setDesc(defaultDescs["Add Obsidian YAML Tags"])
+			.setName("Add Frontmatter Tags")
+			.setDesc(defaultDescs["Add Frontmatter Tags"])
 			.addToggle(toggle => toggle
-				.setValue(plugin.settings.Defaults["Add Obsidian YAML Tags"])
+				.setValue(plugin.settings.Defaults["Add Frontmatter Tags"])
 				.onChange((value) => {
-					plugin.settings.Defaults["Add Obsidian YAML Tags"] = value
+					plugin.settings.Defaults["Add Frontmatter Tags"] = value
 					plugin.saveAllData()
 				})
 			)
 
-		// Format Obsidian Tags as Anki Hierarchical Tags
+		// Convert to Anki Hierarchy
 		new Setting(container)
-			.setName("Format Obsidian Tags as Anki Hierarchical Tags")
-			.setDesc(defaultDescs["Format Obsidian Tags as Anki Hierarchical Tags"])
+			.setName("Convert to Anki Hierarchy")
+			.setDesc(defaultDescs["Convert to Anki Hierarchy"])
 			.addToggle(toggle => toggle
-				.setValue(plugin.settings.Defaults["Format Obsidian Tags as Anki Hierarchical Tags"])
+				.setValue(plugin.settings.Defaults["Convert to Anki Hierarchy"])
 				.onChange((value) => {
-					plugin.settings.Defaults["Format Obsidian Tags as Anki Hierarchical Tags"] = value
+					plugin.settings.Defaults["Convert to Anki Hierarchy"] = value
 					plugin.saveAllData()
 				})
 			)

@@ -25,7 +25,7 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
             allowDuplicate: false,
             duplicateScope: "deck"
         },
-        tags: settings.Defaults.Tag.split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0)
+        tags: settings.Defaults["Default Tags"].split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0)
     }
     result.EXISTING_IDS = await AnkiConnect.invoke('findNotes', { query: "" }) as number[]
 
@@ -46,11 +46,11 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     result.comment = settings.Defaults["ID Comments"]
     result.add_context = settings.Defaults["Add Context"];
     result.add_aliases = settings.Defaults["Add Aliases"];
-    result.add_obs_tags = settings.Defaults["Add Obsidian Tags"]
-    result.format_obs_tags = settings.Defaults["Format Obsidian Tags as Anki Hierarchical Tags"]
+    result.add_obs_tags = settings.Defaults["Add Inline Tags"]
+    result.use_anki_hierarchy = settings.Defaults["Convert to Anki Hierarchy"]
     result.cloze_keyword = settings.Defaults["CurlyCloze - Keyword"]
     result.smart_scan = settings.Defaults["Smart Scan"]
-    result.yaml_tags = settings.Defaults["Add Obsidian YAML Tags"]
+    result.yaml_tags = settings.Defaults["Add Frontmatter Tags"]
     result.regex_required_tags = settings.Defaults["Regex Required Tags"]
     result.link_label = settings.Defaults["Add File Link - Link Label"];
     result.ignored_file_globs = settings.IGNORED_FILE_GLOBS ?? [];

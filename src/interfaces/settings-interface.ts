@@ -22,7 +22,7 @@ export interface PluginSettings {
 	Defaults: {
 		"Scan Directory": string,
 		"Scan Tags": string,
-		"Tag": string,
+		"Default Tags": string,
 		"Deck": string,
 		"Scheduling Interval": number
 		"Add File Link": boolean,
@@ -31,11 +31,11 @@ export interface PluginSettings {
 		"CurlyCloze": boolean,
 		"CurlyCloze - Highlights to Clozes": boolean,
 		"ID Comments": boolean,
-		"Add Obsidian Tags": boolean,
-		"Format Obsidian Tags as Anki Hierarchical Tags": boolean,
+		"Add Inline Tags": boolean,
+		"Add Frontmatter Tags": boolean,
+		"Convert to Anki Hierarchy": boolean,
 		"CurlyCloze - Keyword": string,
 		"Smart Scan": boolean,
-		"Add Obsidian YAML Tags": boolean,
 		"Bulk Delete IDs": boolean,
 		"Regex Required Tags": boolean,
 		"Add File Link - Link Label": string,
@@ -73,7 +73,7 @@ export interface FileData {
 	add_context: boolean
 	add_aliases: boolean
 	add_obs_tags: boolean
-	format_obs_tags: boolean
+	use_anki_hierarchy: boolean
 	cloze_keyword: string
 	yaml_tags: boolean
 	regex_required_tags: boolean

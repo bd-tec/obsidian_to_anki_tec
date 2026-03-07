@@ -96,23 +96,31 @@ Previously hardcoded to "Cloze", you can now set any keyword (e.g., "穴埋め")
 The plugin automatically skips files that haven't changed since the last scan (using MD5 hashes) to improve performance.
 You can now disable this feature in the "General" settings (toggle "Smart Scan" off) to force a full re-scan of all files.
 
-### Extended Tag Support (Add Obsidian Tags)
+### Extended Tag Support (Add Inline Tags)
 
-The "Add Obsidian Tags" feature now supports a wider range of characters.
+The "Add Inline Tags" feature now supports a wider range of characters.
 It correctly identifies and processes tags containing:
 
 - **Japanese/Unicode characters** (e.g., `#重要`)
 - **Nested tags** (e.g., `#parent/child`)
 - **Hyphens** (e.g., `#my-tag`)
 
-### Add Obsidian YAML Tags
+### Add Frontmatter Tags
 
-Enable the "Add Obsidian YAML Tags" setting in the "General" tab to automatically send tags defined in the Obsidian YAML frontmatter (Properties) to Anki.
+Enable the "Add Frontmatter Tags" setting in the "General" tab to automatically send tags defined in the Obsidian YAML frontmatter (Properties) to Anki.
 These tags are **added** to any existing inline or global tags.
 Supported formats:
 
 - List: `tags: \n  - tag1`
 - Array: `tags: [tag1, tag2]`
+
+### Convert to Anki Hierarchy
+
+Enable the "Convert to Anki Hierarchy" setting to automatically convert slash-separated Obsidian tags (e.g., `#foo/bar`) to Anki's hierarchical tag format (`foo::bar`).
+
+- **Applies to**: Both inline tags (`#foo/bar`) and YAML frontmatter tags
+- **Example**: `#japanese/grammar` → `japanese::grammar` in Anki
+- **Benefit**: Preserves your tag hierarchy when syncing to Anki
 
 ### Add Aliases
 

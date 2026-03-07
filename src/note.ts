@@ -141,7 +141,7 @@ abstract class AbstractNote {
         }
         if (data.add_obs_tags) {
             for (let key in template["fields"]) {
-                this.tags.push(...extractObsidianTagsAsAnki(template["fields"][key], data.format_obs_tags))
+                this.tags.push(...extractObsidianTagsAsAnki(template["fields"][key], data.use_anki_hierarchy))
                 template["fields"][key] = template["fields"][key].replace(OBS_TAG_REGEXP, "")
             }
         }

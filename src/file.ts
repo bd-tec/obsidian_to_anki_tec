@@ -155,12 +155,12 @@ abstract class AbstractFile {
             let tags_str = "";
             if (Array.isArray(tags)) {
                 tags_str = tags
-                    .map((tag) => normalizeObsidianFrontmatterTagToAnki(String(tag), this.data.format_obs_tags))
+                    .map((tag) => normalizeObsidianFrontmatterTagToAnki(String(tag), this.data.use_anki_hierarchy))
                     .join(" ");
             } else if (typeof tags === 'string') {
                 tags_str = tags
                     .split(',')
-                    .map((tag) => normalizeObsidianFrontmatterTagToAnki(tag, this.data.format_obs_tags))
+                    .map((tag) => normalizeObsidianFrontmatterTagToAnki(tag, this.data.use_anki_hierarchy))
                     .filter((tag) => tag.length > 0)
                     .join(" ");
             }
