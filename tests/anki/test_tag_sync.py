@@ -29,7 +29,7 @@ def test_deck_default_exists(col: Collection):
     assert col.decks.id_for_name('Default') is not None
 
 def test_cards_count(col: Collection):
-    assert len(col.find_cards( col.build_search_string(SearchNode(deck='Default')) )) == 7
+    assert len(col.find_cards( col.build_search_string(SearchNode(deck='Default')) )) == 8
 
 def test_cards_ids_from_obsidian(col: Collection):
 
@@ -85,34 +85,40 @@ def test_cards_front_back_tag_type(col: Collection):
     assert note3.has_tag('meow')
     assert len(note3.tags) == 2
 
-    note4 = find_note_with_1st_field("This is a test with file tags specified in new line", anki_IDs, col)
-    # assert note4.fields[0] == "This is a test with file tags specified in new line"
+    note4 = find_note_with_1st_field("This is a test. this should have a nested obsidian tag<br />\nAnd the test is continuing. ", anki_IDs, col)
     assert note4.fields[1] == "Test successful!"
-    assert note4.has_tag('Maths')
-    assert note4.has_tag('School')
-    assert note4.has_tag('Physics')
-    assert len(note4.tags) == 4
+    assert note4.has_tag('tag::subtag')
+    assert not note4.has_tag('tag/subtag')
+    assert len(note4.tags) == 2
 
-    note5 = find_note_with_1st_field("This is a test 2 with file tags specified in new line<br />\nAnd the test is continuing.", anki_IDs, col)
-    # assert note5.fields[0] == "This is a test 2 with file tags specified in new line<br />\nAnd the test is continuing."
+    note5 = find_note_with_1st_field("This is a test with file tags specified in new line", anki_IDs, col)
+    # assert note5.fields[0] == "This is a test with file tags specified in new line"
     assert note5.fields[1] == "Test successful!"
     assert note5.has_tag('Maths')
     assert note5.has_tag('School')
     assert note5.has_tag('Physics')
     assert len(note5.tags) == 4
 
-    note6 = find_note_with_1st_field("This is a test with file tags specified inline", anki_IDs, col)
-    # assert note6.fields[0] == "This is a test with file tags specified inline"
+    note6 = find_note_with_1st_field("This is a test 2 with file tags specified in new line<br />\nAnd the test is continuing.", anki_IDs, col)
+    # assert note6.fields[0] == "This is a test 2 with file tags specified in new line<br />\nAnd the test is continuing."
     assert note6.fields[1] == "Test successful!"
     assert note6.has_tag('Maths')
     assert note6.has_tag('School')
     assert note6.has_tag('Physics')
     assert len(note6.tags) == 4
 
-    note7 = find_note_with_1st_field("This is a test 2 with file tags specified inline<br />\nAnd the test is continuing.", anki_IDs, col)
-    # assert note7.fields[0] == "This is a test 2 with file tags specified inline<br />\nAnd the test is continuing."
+    note7 = find_note_with_1st_field("This is a test with file tags specified inline", anki_IDs, col)
+    # assert note7.fields[0] == "This is a test with file tags specified inline"
     assert note7.fields[1] == "Test successful!"
     assert note7.has_tag('Maths')
     assert note7.has_tag('School')
     assert note7.has_tag('Physics')
     assert len(note7.tags) == 4
+
+    note8 = find_note_with_1st_field("This is a test 2 with file tags specified inline<br />\nAnd the test is continuing.", anki_IDs, col)
+    # assert note8.fields[0] == "This is a test 2 with file tags specified inline<br />\nAnd the test is continuing."
+    assert note8.fields[1] == "Test successful!"
+    assert note8.has_tag('Maths')
+    assert note8.has_tag('School')
+    assert note8.has_tag('Physics')
+    assert len(note8.tags) == 4

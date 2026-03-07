@@ -32,6 +32,7 @@ export interface PluginSettings {
 		"CurlyCloze - Highlights to Clozes": boolean,
 		"ID Comments": boolean,
 		"Add Obsidian Tags": boolean,
+		"Format Obsidian Tags as Anki Hierarchical Tags": boolean,
 		"CurlyCloze - Keyword": string,
 		"Smart Scan": boolean,
 		"Add Obsidian YAML Tags": boolean,
@@ -72,6 +73,7 @@ export interface FileData {
 	add_context: boolean
 	add_aliases: boolean
 	add_obs_tags: boolean
+	format_obs_tags: boolean
 	cloze_keyword: string
 	yaml_tags: boolean
 	regex_required_tags: boolean

@@ -63,6 +63,13 @@ function* findignore(pattern: RegExp, text: string, ignore_spans: Array<[number,
     }
 }
 
+function normalizeObsidianFrontmatterTagToAnki(tag: string, format: boolean): string {
+    if (format) {
+        return tag.trim().replace(/\//g, '::')
+    }
+    return tag.trim()
+}
+
 abstract class AbstractFile {
     file: string
     path: string
@@ -147,9 +154,15 @@ abstract class AbstractFile {
             let tags = this.file_cache.frontmatter.tags;
             let tags_str = "";
             if (Array.isArray(tags)) {
-                tags_str = tags.join(" ");
+                tags_str = tags
+                    .map((tag) => normalizeObsidianFrontmatterTagToAnki(String(tag), this.data.format_obs_tags))
+                    .join(" ");
             } else if (typeof tags === 'string') {
-                tags_str = tags.replace(/,/g, " ");
+                tags_str = tags
+                    .split(',')
+                    .map((tag) => normalizeObsidianFrontmatterTagToAnki(tag, this.data.format_obs_tags))
+                    .filter((tag) => tag.length > 0)
+                    .join(" ");
             }
 
             if (tags_str) {

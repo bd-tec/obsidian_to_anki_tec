@@ -51,6 +51,7 @@ export default class MyPlugin extends Plugin {
 				"CurlyCloze - Highlights to Clozes": false,
 				"ID Comments": true,
 				"Add Obsidian Tags": false,
+				"Format Obsidian Tags as Anki Hierarchical Tags": true,
 				"CurlyCloze - Keyword": "Cloze",
 				"Smart Scan": true,
 				"Add Obsidian YAML Tags": false,

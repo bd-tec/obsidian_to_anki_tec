@@ -14,6 +14,17 @@ export const ID_REGEXP_STR: string = String.raw`\n?(?:<!--)?(?:ID: (\d+).*)`
 export const TAG_REGEXP_STR: string = String.raw`(Tags: .*)`
 const OBS_TAG_REGEXP: RegExp = /#([a-zA-Z0-9_\u00C0-\uFFFF\/\-]+)/g
 
+function normalizeObsidianTagToAnki(tag: string, format: boolean): string {
+    if (format) {
+        return tag.trim().replace(/\//g, '::')
+    }
+    return tag.trim()
+}
+
+function extractObsidianTagsAsAnki(fieldValue: string, format: boolean): string[] {
+    return Array.from(fieldValue.matchAll(OBS_TAG_REGEXP), match => normalizeObsidianTagToAnki(match[1], format))
+}
+
 const ANKI_CLOZE_REGEXP: RegExp = /{{c\d+::[\s\S]+?}}/
 export const CLOZE_ERROR: number = 42
 export const NOTE_TYPE_ERROR: number = 69
@@ -130,9 +141,7 @@ abstract class AbstractNote {
         }
         if (data.add_obs_tags) {
             for (let key in template["fields"]) {
-                for (let match of template["fields"][key].matchAll(OBS_TAG_REGEXP)) {
-                    this.tags.push(match[1])
-                }
+                this.tags.push(...extractObsidianTagsAsAnki(template["fields"][key], data.format_obs_tags))
                 template["fields"][key] = template["fields"][key].replace(OBS_TAG_REGEXP, "")
             }
         }

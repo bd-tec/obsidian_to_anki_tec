@@ -20,6 +20,7 @@ const defaultDescs = {
 	"ID Comments": "Wrap note IDs in a HTML comment.",
 	"Add Obsidian Tags": "Interpret #tags in the fields of a note as Anki tags, removing them from the note text in Anki.",
 	"Add Obsidian YAML Tags": "Send tags defined in YAML frontmatter to Anki.",
+	"Format Obsidian Tags as Anki Hierarchical Tags": "Convert slash-separated Obsidian tags (e.g., #foo/bar) to Anki's hierarchical format (foo::bar). Applies to inline tags and YAML frontmatter tags.",
 	"Smart Scan": "Skip files that haven't changed since the last scan (based on MD5 hash). Disable to force a full scan.",
 	"Bulk Delete IDs": "Enables 'Delete all IDs in file' menu. Deletes Anki notes for IDs found in the selected file and removes the IDs.",
 	"Save Note ID to Frontmatter": "Save the Anki Note ID (nid) to the YAML frontmatter instead of an inline comment. Applies ONLY to files that correspond to a single Anki note. Multiple notes in a file will still use inline IDs.",
@@ -167,6 +168,9 @@ export class SettingsTab extends PluginSettingTab {
 
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Add Obsidian Tags"))) {
 			plugin.settings["Defaults"]["Add Obsidian Tags"] = false
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Format Obsidian Tags as Anki Hierarchical Tags"))) {
+			plugin.settings["Defaults"]["Format Obsidian Tags as Anki Hierarchical Tags"] = true
 		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("CurlyCloze - Keyword"))) {
 			plugin.settings["Defaults"]["CurlyCloze - Keyword"] = "Cloze"

@@ -47,6 +47,7 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     result.add_context = settings.Defaults["Add Context"];
     result.add_aliases = settings.Defaults["Add Aliases"];
     result.add_obs_tags = settings.Defaults["Add Obsidian Tags"]
+    result.format_obs_tags = settings.Defaults["Format Obsidian Tags as Anki Hierarchical Tags"]
     result.cloze_keyword = settings.Defaults["CurlyCloze - Keyword"]
     result.smart_scan = settings.Defaults["Smart Scan"]
     result.yaml_tags = settings.Defaults["Add Obsidian YAML Tags"]

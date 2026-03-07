@@ -21,3 +21,11 @@ This is a test. this should have meow-tag
 And the test is continuing. #meow
 Back: Test successful!
 END
+
+<!-- CARD -->
+START
+Basic
+This is a test. this should have a nested obsidian tag
+And the test is continuing. #tag/subtag
+Back: Test successful!
+END
