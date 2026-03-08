@@ -376,9 +376,7 @@ export class RegexNote {
         }
         if (data.add_obs_tags) {
             for (let key in template["fields"]) {
-                for (let match of template["fields"][key].matchAll(OBS_TAG_REGEXP)) {
-                    this.tags.push(match[1])
-                }
+                this.tags.push(...extractObsidianTagsAsAnki(template["fields"][key], data.use_anki_hierarchy))
                 template["fields"][key] = template["fields"][key].replace(OBS_TAG_REGEXP, "")
             }
         }
