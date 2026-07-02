@@ -129,6 +129,129 @@ Enable the "Add Aliases" setting in the "General" tab to automatically append al
 - **Config**: In "Note Types" settings, select the target field for aliases in the "Aliases Field" column.
 - **Format**: Multiple aliases are separated by a newline (`<br>`) to display as a list in Anki.
 
+### Structured Parser Example
+
+The structured parser is meant for people who prefer writing flashcards in readable Markdown instead of maintaining one large custom regex.
+
+Recommended setup:
+
+- Enable `Structured Parser`
+- Choose a note type such as `Basic`
+- Keep `Front Back Separator` as `#flashcard`
+- Keep `Card End Marker` as `---`
+
+Basic flashcard example:
+
+```md
+What is the capital of France? 
+
+#flashcard
+
+Paris
+
+---
+```
+
+How this works:
+
+- everything before `#flashcard` goes to the front field
+- everything after it goes to the back field
+- `---` ends the card
+
+You can place multiple cards in one note:
+
+```md
+What is the capital of France?
+
+#flashcard
+
+Paris
+---
+
+What is the capital of Japan?
+
+#flashcard
+
+Tokyo
+---
+```
+
+If you want a cleaner explanation area inside the same card, keep the main answer first and then add labeled sections:
+
+```md
+What is the treatment of choice for anaphylaxis?
+
+#flashcard
+
+Intramuscular epinephrine.
+
+**Explanation**
+Give IM epinephrine early in the lateral thigh. Airway, oxygen, IV fluids, and monitoring are also important.
+
+**Ref**
+Emergency guideline summary
+---
+```
+
+User-friendly rule for labeled sections:
+
+- if you do nothing, everything after the separator stays in the back field
+- if you add a `Section Field Map`, labeled sections such as `Explanation` or `Ref` can be routed into other Anki fields
+
+Important note:
+
+- in the settings UI, you select the Anki field first and then type the note label
+- but the saved rule format is still `Label in note=Anki field name`
+- that is because the parser first detects the label in your Markdown note, then sends that block to the chosen field
+
+What `Explanation=Extra` means:
+
+- `Explanation` = the label you write in your note
+- `Extra` = the Anki field name that should receive that section
+
+What `Ref=Source` means:
+
+- `Ref` = the label you write in your note
+- `Source` = the Anki field name that should receive that section
+
+So the saved rule format is:
+
+```text
+Label in note=Anki field name
+```
+
+Example:
+
+```text
+Explanation=Extra
+Ref=Source
+```
+
+How to use this properly:
+
+1. In Anki, make sure your note type has those fields.
+2. Example note type fields:
+   `Front`, `Back`, `Extra`, `Source`
+3. In the plugin settings, open `Structured Parser - Section Field Map`.
+4. Add:
+   `Explanation=Extra`
+   `Ref=Source`
+
+Then the result will be:
+
+- question text goes to `Front`
+- main answer goes to `Back`
+- the `Explanation` block goes to `Extra`
+- the `Ref` block goes to `Source`
+
+If your Anki note type does not have `Extra` or `Source`, use the real field names from your note type instead.
+
+This setup is useful when you want:
+
+- short answer on the card back
+- longer teaching notes in another field
+- cleaner review cards without losing context
+
 ### Scan Tags
 
 You can filter which files to scan based on their tags (both inline `#tags` and Frontmatter tags).

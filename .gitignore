@@ -258,6 +258,10 @@ build_src
 .flymake*
 .idea
 .DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Icon?
 docs/_build
 docs/_static
 docs/_templates
@@ -274,8 +278,7 @@ Vagrantfile
 *.cid
 
 # Obsidian-to-Anki plugin Specifc
-# Complied Plugin Outputs
-main.js
+# Keep release/runtime files trackable. Only ignore generated test outputs.
 
 tests/test_config/*
 tests/test_vault/*

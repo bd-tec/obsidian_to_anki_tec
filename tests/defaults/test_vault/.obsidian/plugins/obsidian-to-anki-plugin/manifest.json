@@ -1,10 +1,10 @@
 {
   "id": "obsidian-to-anki-plugin",
-  "name": "Obsidian_to_Anki",
-  "version": "3.4.2",
+  "name": "Obsidian_to_Anki_tec",
+  "version": "5.0.8",
   "minAppVersion": "0.9.20",
-  "description": "This is an Anki integration plugin! Designed for efficient bulk exporting.",
-  "author": "Pseudonium",
-  "authorUrl": "https://github.com/Pseudonium/Obsidian_to_Anki",
+  "description": "Forked version featuring a redesigned UI, extended tag support (YAML/Scan Tags), and improved sync workflow.",
+  "author": "n4tt0u (Original: Pseudonium)",
+  "authorUrl": "https://github.com/bd-tec/obsidian_to_anki_tec",
   "isDesktopOnly": true
 }
