@@ -27,7 +27,18 @@ const defaultDescs = {
 	"Render Clozes in Reading View": "Render {{c1::cloze::hint}} as flattened text in Reading View.",
 	"Render Clozes - Highlight": "Apply highlight style to the rendered text.",
 	"Show Status Bar": "Show the Anki sync status indicator in the status bar.",
-	"AnkiConnect API Key": "The API key configured in AnkiConnect settings (leave blank if none)."
+	"AnkiConnect API Key": "The API key configured in AnkiConnect settings (leave blank if none).",
+	"Structured Parser": "Use the structured parser instead of custom regex for the configured note type. Splits cards by configurable markers instead of a regex.",
+	"Structured Parser - Note Type": "The Anki note type to use with the structured parser.",
+	"Structured Parser - Front Back Separator": "The text that separates the question/front from the answer/back. Example: ? #flashcard.",
+	"Structured Parser - Card End Marker": "The text on its own line that marks the end of a card. Example: ---.",
+	"Structured Parser - Include From Heading Level": "Treat headings as section dividers before parsing cards. Exclude all headings removes all headings from card content.",
+	"Structured Parser - Front Field": "Which Anki field receives everything before the separator. Leave blank to use the first field.",
+	"Structured Parser - Back Field": "Which Anki field receives the main answer section after the separator. Leave blank to use the second field.",
+	"Structured Parser - File Link Field": "Optional field for a normal Obsidian file link. Leave blank to skip it.",
+	"Structured Parser - Context Field": "Optional field for context path text. Leave blank to skip it.",
+	"Structured Parser - Context Link Field": "Optional field for an exact card link using Advanced URI. Leave blank to skip it.",
+	"Structured Parser - Section Field Map": "Optional section routing, one per line. Example: Explanation=Extra."
 }
 
 export const DEFAULT_IGNORED_FILE_GLOBS = [
@@ -232,6 +243,39 @@ export class SettingsTab extends PluginSettingTab {
 		if (!(plugin.settings["Defaults"].hasOwnProperty("AnkiConnect API Key"))) {
 			plugin.settings["Defaults"]["AnkiConnect API Key"] = ""
 		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser"))) {
+			plugin.settings["Defaults"]["Structured Parser"] = false
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Note Type"))) {
+			plugin.settings["Defaults"]["Structured Parser - Note Type"] = ""
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Front Back Separator"))) {
+			plugin.settings["Defaults"]["Structured Parser - Front Back Separator"] = "? #flashcard"
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Card End Marker"))) {
+			plugin.settings["Defaults"]["Structured Parser - Card End Marker"] = "---"
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Include From Heading Level"))) {
+			plugin.settings["Defaults"]["Structured Parser - Include From Heading Level"] = 0
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Front Field"))) {
+			plugin.settings["Defaults"]["Structured Parser - Front Field"] = ""
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Back Field"))) {
+			plugin.settings["Defaults"]["Structured Parser - Back Field"] = ""
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - File Link Field"))) {
+			plugin.settings["Defaults"]["Structured Parser - File Link Field"] = ""
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Context Field"))) {
+			plugin.settings["Defaults"]["Structured Parser - Context Field"] = ""
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Context Link Field"))) {
+			plugin.settings["Defaults"]["Structured Parser - Context Link Field"] = ""
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Section Field Map"))) {
+			plugin.settings["Defaults"]["Structured Parser - Section Field Map"] = ""
+		}
 
 		for (let key of Object.keys(defaultDescs)) {
 			// Skip Scan Directory (already added above), tag settings (handled in addTagSettings), and other special settings
@@ -253,7 +297,18 @@ export class SettingsTab extends PluginSettingTab {
 				key === "Render Clozes - Highlight" ||
 				key === "Cloze Deletion Context Menu" ||
 				key === "Show Status Bar" ||
-				key === "AnkiConnect API Key") {
+				key === "AnkiConnect API Key" ||
+				key === "Structured Parser" ||
+				key === "Structured Parser - Note Type" ||
+				key === "Structured Parser - Front Back Separator" ||
+				key === "Structured Parser - Card End Marker" ||
+				key === "Structured Parser - Include From Heading Level" ||
+				key === "Structured Parser - Front Field" ||
+				key === "Structured Parser - Back Field" ||
+				key === "Structured Parser - File Link Field" ||
+				key === "Structured Parser - Context Field" ||
+				key === "Structured Parser - Context Link Field" ||
+				key === "Structured Parser - Section Field Map") {
 				continue
 			}
 
@@ -501,6 +556,144 @@ export class SettingsTab extends PluginSettingTab {
 				this.setup_alias_field(note_type, cells[cellIdx++], plugin);
 			}
 		}
+	}
+
+	parseSectionFieldMap(raw: string): { label: string, field: string }[] {
+		const rules: { label: string, field: string }[] = []
+		if (!raw) return rules
+		for (let line of raw.split('\n')) {
+			const trimmed = line.trim()
+			if (!trimmed) continue
+			const separatorIndex = trimmed.includes('=>') ? trimmed.indexOf('=>') : trimmed.indexOf('=')
+			if (separatorIndex === -1) continue
+			const label = trimmed.slice(0, separatorIndex).trim()
+			const field = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim()
+			if (!label || !field) continue
+			rules.push({ label, field })
+		}
+		return rules
+	}
+
+	serializeSectionFieldMap(rules: { label: string, field: string }[]): string {
+		return rules
+			.map(rule => ({
+				label: rule.label.trim(),
+				field: rule.field.trim()
+			}))
+			.filter(rule => rule.label.length > 0 && rule.field.length > 0)
+			.map(rule => `${rule.label}=${rule.field}`)
+			.join('\n')
+	}
+
+	getSectionTargetFields(plugin: any, availableFields: string[]): string[] {
+		const frontField = plugin.settings.Defaults["Structured Parser - Front Field"] || availableFields[0] || ""
+		const backField = plugin.settings.Defaults["Structured Parser - Back Field"] || availableFields[1] || availableFields[0] || ""
+		const fileLinkField = plugin.settings.Defaults["Structured Parser - File Link Field"] || ""
+		const contextField = plugin.settings.Defaults["Structured Parser - Context Field"] || ""
+		const contextLinkField = plugin.settings.Defaults["Structured Parser - Context Link Field"] || ""
+		const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean))
+		return availableFields.filter(field => !reserved.has(field))
+	}
+
+	normalizeSectionFieldMap(raw: string, availableFields: string[]): string {
+		const plugin = (this as any).plugin
+		const allowed = new Set(this.getSectionTargetFields(plugin, availableFields))
+		const rules = this.parseSectionFieldMap(raw)
+			.filter(rule => allowed.has(rule.field))
+		return this.serializeSectionFieldMap(rules)
+	}
+
+	renderSectionFieldMapEditor(container: HTMLElement, plugin: any, availableFields: string[]) {
+		const exampleTargetField = this.getSectionTargetFields(plugin, availableFields)[0] || "Additional Field"
+		const sectionTargetFields = this.getSectionTargetFields(plugin, availableFields)
+		const rules = this.parseSectionFieldMap(plugin.settings.Defaults["Structured Parser - Section Field Map"] || "")
+			.filter(rule => !rule.field || sectionTargetFields.includes(rule.field))
+		const wrapper = container.createDiv({ cls: "anki-section-map-editor" })
+		const saveRules = () => {
+			plugin.settings.Defaults["Structured Parser - Section Field Map"] = this.serializeSectionFieldMap(rules)
+			plugin.saveAllData()
+		}
+		const listEl = wrapper.createDiv({ cls: "anki-section-map-rule-list" })
+		const renderRules = () => {
+			listEl.empty()
+			if (rules.length === 0) {
+				listEl.createEl('div', {
+					text: "No section rules added yet.",
+					cls: 'setting-item-description'
+				})
+				return
+			}
+			rules.forEach((rule, index) => {
+				const ruleEl = listEl.createDiv({ cls: 'anki-section-rule-item' })
+				const headerEl = ruleEl.createDiv({ cls: 'anki-section-rule-header' })
+				headerEl.createEl('div', {
+					text: `Rule ${index + 1}`,
+					cls: 'setting-item-name'
+				})
+				headerEl.createEl('div', {
+					text: 'Choose the additional field, then enter the section label that should be captured.',
+					cls: 'setting-item-description'
+				})
+				const removeButton = headerEl.createEl('button', { text: 'Remove' })
+				removeButton.addEventListener('click', () => {
+					rules.splice(index, 1)
+					saveRules()
+					renderRules()
+				})
+
+				const rowEl = ruleEl.createDiv({ cls: 'anki-section-rule-row' })
+				rowEl.createEl('label', {
+					text: 'Field',
+					cls: 'anki-section-rule-label'
+				})
+				const fieldSelect = rowEl.createEl('select')
+				fieldSelect.addClass('anki-section-rule-input')
+				const emptyOption = fieldSelect.createEl('option', { text: 'Select field' })
+				emptyOption.value = ''
+				for (let field of sectionTargetFields) {
+					const option = fieldSelect.createEl('option', { text: field })
+					option.value = field
+				}
+				fieldSelect.value = sectionTargetFields.includes(rule.field) ? rule.field : ''
+				fieldSelect.addEventListener('change', () => {
+					rules[index].field = fieldSelect.value
+					saveRules()
+				})
+				const triggerInput = rowEl.createEl('input', {
+					type: 'text',
+					placeholder: 'Section label in note',
+					value: rule.label || ''
+				})
+				triggerInput.addClass('anki-section-rule-input')
+				triggerInput.addEventListener('change', () => {
+					rules[index].label = triggerInput.value
+					saveRules()
+				})
+			})
+		}
+
+		new Setting(wrapper)
+			.setName("Section Field Map")
+			.setDesc(`Use the + button to route labeled sections into additional fields only. Example target field: ${exampleTargetField}.`)
+			.addButton(button => {
+				button
+					.setButtonText("+")
+					.setTooltip("Add section rule")
+					.setDisabled(sectionTargetFields.length === 0)
+					.onClick(() => {
+						rules.push({
+							label: "",
+							field: sectionTargetFields[0] || ""
+						})
+						saveRules()
+						renderRules()
+					})
+			})
+		wrapper.createEl('div', {
+			text: "Add a rule only when a labeled section should go to a separate Anki field. If no rules are added, Back keeps everything after the separator.",
+			cls: 'setting-item-description'
+		})
+		renderRules()
 	}
 
 	getFolderRules(record: Record<string, string>): { path: string, value: string }[] {
@@ -972,6 +1165,190 @@ export class SettingsTab extends PluginSettingTab {
 					new Notice("Please reload Obsidian to apply changes.")
 				})
 			)
+
+		container.createEl('h3', { text: 'Structured Parser', cls: 'anki-settings-section' })
+		container.createEl('p', {
+			text: 'An alternative to custom regex that splits cards by configurable markers.',
+			cls: 'setting-item-description'
+		})
+		new Setting(container)
+			.setName("Enable Structured Parser")
+			.setDesc(defaultDescs["Structured Parser"])
+			.addToggle(toggle => toggle
+				.setValue(plugin.settings.Defaults["Structured Parser"])
+				.onChange((value) => {
+					plugin.settings.Defaults["Structured Parser"] = value
+					plugin.saveAllData()
+					this.display()
+				})
+			)
+
+		if (plugin.settings.Defaults["Structured Parser"]) {
+			const selectedNoteType = plugin.settings.Defaults["Structured Parser - Note Type"] || ""
+			const availableFields = selectedNoteType ? (plugin.fields_dict[selectedNoteType] || []) : []
+
+			container.createEl('h4', { text: 'Main Fields', cls: 'anki-settings-section' })
+			new Setting(container)
+				.setName("Note Type")
+				.setDesc(defaultDescs["Structured Parser - Note Type"])
+				.addDropdown(dropdown => {
+					dropdown.addOption("", "None")
+					for (let note_type of plugin.note_types) {
+						dropdown.addOption(note_type, note_type)
+					}
+					dropdown.setValue(plugin.settings.Defaults["Structured Parser - Note Type"] || "")
+					dropdown.onChange((value) => {
+						plugin.settings.Defaults["Structured Parser - Note Type"] = value
+						if (value && plugin.fields_dict[value]) {
+							const noteFields = plugin.fields_dict[value]
+							if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Front Field"])) {
+								plugin.settings.Defaults["Structured Parser - Front Field"] = noteFields[0] || ""
+							}
+							if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Back Field"])) {
+								plugin.settings.Defaults["Structured Parser - Back Field"] = noteFields[1] || noteFields[0] || ""
+							}
+							if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - File Link Field"])) {
+								plugin.settings.Defaults["Structured Parser - File Link Field"] = ""
+							}
+							if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Context Field"])) {
+								plugin.settings.Defaults["Structured Parser - Context Field"] = ""
+							}
+							if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Context Link Field"])) {
+								plugin.settings.Defaults["Structured Parser - Context Link Field"] = ""
+							}
+							plugin.settings.Defaults["Structured Parser - Section Field Map"] = this.normalizeSectionFieldMap(plugin.settings.Defaults["Structured Parser - Section Field Map"] || "", noteFields)
+						}
+						plugin.saveAllData()
+						this.display()
+					})
+				})
+
+			if (availableFields.length > 0) {
+				new Setting(container)
+					.setName("Front Field")
+					.setDesc(defaultDescs["Structured Parser - Front Field"])
+					.addDropdown(dropdown => {
+						dropdown.addOption("", "Auto")
+						for (let field of availableFields) {
+							dropdown.addOption(field, field)
+						}
+						dropdown.setValue(plugin.settings.Defaults["Structured Parser - Front Field"] || "")
+						dropdown.onChange((value) => {
+							plugin.settings.Defaults["Structured Parser - Front Field"] = value
+							plugin.saveAllData()
+							this.display()
+						})
+					})
+				new Setting(container)
+					.setName("Back Field")
+					.setDesc(defaultDescs["Structured Parser - Back Field"])
+					.addDropdown(dropdown => {
+						dropdown.addOption("", "Auto")
+						for (let field of availableFields) {
+							dropdown.addOption(field, field)
+						}
+						dropdown.setValue(plugin.settings.Defaults["Structured Parser - Back Field"] || "")
+						dropdown.onChange((value) => {
+							plugin.settings.Defaults["Structured Parser - Back Field"] = value
+							plugin.saveAllData()
+							this.display()
+						})
+					})
+			}
+
+			container.createEl('h4', { text: 'Card Boundaries', cls: 'anki-settings-section' })
+			new Setting(container)
+				.setName("Front/Back Separator")
+				.setDesc(defaultDescs["Structured Parser - Front Back Separator"])
+				.addText(text => text
+					.setValue(plugin.settings.Defaults["Structured Parser - Front Back Separator"])
+					.setPlaceholder("? #flashcard")
+					.onChange((value) => {
+						plugin.settings.Defaults["Structured Parser - Front Back Separator"] = value
+						plugin.saveAllData()
+					})
+				)
+			new Setting(container)
+				.setName("Card End Marker")
+				.setDesc(defaultDescs["Structured Parser - Card End Marker"])
+				.addText(text => text
+					.setValue(plugin.settings.Defaults["Structured Parser - Card End Marker"])
+					.setPlaceholder("---")
+					.onChange((value) => {
+						plugin.settings.Defaults["Structured Parser - Card End Marker"] = value
+						plugin.saveAllData()
+					})
+				)
+			new Setting(container)
+				.setName("Include From Heading Level")
+				.setDesc(defaultDescs["Structured Parser - Include From Heading Level"])
+				.addDropdown(dropdown => {
+					dropdown.addOption("-1", "Exclude all headings")
+					dropdown.addOption("0", "No heading filter")
+					dropdown.addOption("1", "H1")
+					dropdown.addOption("2", "H2")
+					dropdown.addOption("3", "H3")
+					dropdown.addOption("4", "H4")
+					dropdown.addOption("5", "H5")
+					dropdown.addOption("6", "H6")
+					dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0))
+					dropdown.onChange((value) => {
+						plugin.settings.Defaults["Structured Parser - Include From Heading Level"] = parseInt(value)
+						plugin.saveAllData()
+					})
+				})
+
+			if (availableFields.length > 0) {
+				container.createEl('h4', { text: 'Auto Fields', cls: 'anki-settings-section' })
+				new Setting(container)
+					.setName("File Link Field")
+					.setDesc(defaultDescs["Structured Parser - File Link Field"])
+					.addDropdown(dropdown => {
+						dropdown.addOption("", "Blank")
+						for (let field of availableFields) {
+							dropdown.addOption(field, field)
+						}
+						dropdown.setValue(plugin.settings.Defaults["Structured Parser - File Link Field"] || "")
+						dropdown.onChange((value) => {
+							plugin.settings.Defaults["Structured Parser - File Link Field"] = value
+							plugin.saveAllData()
+							this.display()
+						})
+					})
+				new Setting(container)
+					.setName("Context Path")
+					.setDesc(defaultDescs["Structured Parser - Context Field"])
+					.addDropdown(dropdown => {
+						dropdown.addOption("", "Blank")
+						for (let field of availableFields) {
+							dropdown.addOption(field, field)
+						}
+						dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Field"] || "")
+						dropdown.onChange((value) => {
+							plugin.settings.Defaults["Structured Parser - Context Field"] = value
+							plugin.saveAllData()
+							this.display()
+						})
+					})
+				new Setting(container)
+					.setName("Exact Card Link Field")
+					.setDesc(defaultDescs["Structured Parser - Context Link Field"])
+					.addDropdown(dropdown => {
+						dropdown.addOption("", "Blank")
+						for (let field of availableFields) {
+							dropdown.addOption(field, field)
+						}
+						dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Link Field"] || "")
+						dropdown.onChange((value) => {
+							plugin.settings.Defaults["Structured Parser - Context Link Field"] = value
+							plugin.saveAllData()
+							this.display()
+						})
+					})
+				container.createEl('h4', { text: 'Extra Section Routing', cls: 'anki-settings-section' })
+				this.renderSectionFieldMapEditor(container, plugin, availableFields)
+			}
+		}
 	}
 
 	private setup_ignore_files(container: HTMLElement, plugin: any) {

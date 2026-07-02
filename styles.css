@@ -258,9 +258,53 @@
   min-width: 0;
 }
 
+.anki-section-map-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.anki-section-rule-item {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--background-primary-alt);
+}
+
+.anki-section-rule-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.anki-section-rule-header .setting-item-description {
+  grid-column: 1 / 2;
+  margin: 0;
+}
+
+.anki-section-rule-row {
+  display: grid;
+  grid-template-columns: 72px 180px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.anki-section-rule-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.anki-section-rule-input {
+  width: 100%;
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .anki-folder-rule-row,
-  .anki-folder-rule-value-row {
+  .anki-folder-rule-value-row,
+  .anki-section-rule-header,
+  .anki-section-rule-row {
     grid-template-columns: 1fr;
   }
 }

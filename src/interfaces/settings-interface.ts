@@ -46,7 +46,18 @@ export interface PluginSettings {
 		"Render Clozes - Highlight": boolean,
 		"Cloze Deletion Context Menu": boolean,
 		"Show Status Bar": boolean,
-		"AnkiConnect API Key": string
+		"AnkiConnect API Key": string,
+		"Structured Parser": boolean,
+		"Structured Parser - Note Type": string,
+		"Structured Parser - Front Back Separator": string,
+		"Structured Parser - Card End Marker": string,
+		"Structured Parser - Include From Heading Level": number,
+		"Structured Parser - Front Field": string,
+		"Structured Parser - Back Field": string,
+		"Structured Parser - File Link Field": string,
+		"Structured Parser - Context Field": string,
+		"Structured Parser - Context Link Field": string,
+		"Structured Parser - Section Field Map": string
 	},
 	IGNORED_FILE_GLOBS: string[]
 }
@@ -83,6 +94,17 @@ export interface FileData {
 	add_file_link: boolean
 	link_label: string
 	saveIDToFrontmatter: boolean
+	structured_parser: boolean
+	structured_note_type: string
+	structured_separator: string
+	structured_card_end: string
+	structured_include_heading_level: number
+	structured_front_field: string
+	structured_back_field: string
+	structured_file_link_field: string
+	structured_context_field: string
+	structured_context_link_field: string
+	structured_section_field_map: Record<string, string>
 }
 
 export interface ParsedSettings extends FileData {

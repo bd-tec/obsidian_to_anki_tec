@@ -10,6 +10,7 @@ import * as AnkiConnect from './anki'
 import * as c from './constants'
 import { FormatConverter } from './format'
 import { CachedMetadata, HeadingCache } from 'obsidian'
+import { parseStructuredCards, structuredCardToNote } from './structured-parser'
 
 const double_regexp: RegExp = /(?:\r\n|\r|\n)((?:\r\n|\r|\n)(?:<!--)?ID: \d+)/g
 
@@ -24,6 +25,10 @@ function id_to_str(identifier: number, inline: boolean = false, comment: boolean
         result += "\n"
     }
     return result
+}
+
+function anchor_to_str(identifier: number): string {
+    return "^anki-" + identifier.toString() + "\n"
 }
 
 function apply_edits(text: string, edits: Array<{ start: number, end: number, text: string }>): string {
@@ -336,6 +341,9 @@ export class AllFile extends AbstractFile {
     inline_id_indexes: number[]
     regex_notes_to_add: AnkiConnectNote[]
     regex_id_indexes: number[]
+    structured_notes_to_add: AnkiConnectNote[]
+    structured_id_indexes: number[]
+    structured_writebacks: { note: AnkiConnectNote, writePosition: number, startOffset: number, hasAnchor: boolean }[]
 
     useFrontmatterID: boolean = false
     frontmatterID: number | null = null
@@ -396,9 +404,12 @@ export class AllFile extends AbstractFile {
         this.notes_to_add = []
         this.inline_notes_to_add = []
         this.regex_notes_to_add = []
+        this.structured_notes_to_add = []
         this.id_indexes = []
         this.inline_id_indexes = []
         this.regex_id_indexes = []
+        this.structured_id_indexes = []
+        this.structured_writebacks = []
         this.notes_to_edit = []
         this.notes_to_delete = []
     }
@@ -585,6 +596,57 @@ export class AllFile extends AbstractFile {
         }
     }
 
+    scanStructured() {
+        const noteType = this.data.structured_note_type
+        if (!noteType) return
+        if (!(this.data.fields_dict.hasOwnProperty(noteType))) return
+
+        const cards = parseStructuredCards(
+            this.file,
+            this.data.structured_separator,
+            this.data.structured_card_end,
+            this.data.structured_include_heading_level,
+            this.data.structured_section_field_map
+        )
+        const filename = basename(this.path, extname(this.path))
+        for (let card of cards) {
+            this.ignore_spans.push([card.startOffset, card.idWriteOffset])
+            for (let span of card.idSpans) {
+                this.existingIDSpans.push(span)
+            }
+            const context = this.data.structured_context_field ? this.getContextAtIndex(card.startOffset) : ""
+            const parsed = structuredCardToNote(
+                card,
+                noteType,
+                this.target_deck,
+                this.url,
+                this.frozen_fields_dict,
+                this.data,
+                this.formatter,
+                context,
+                this.aliases,
+                filename,
+                this.global_tags
+            )
+            this.structured_writebacks.push({
+                note: parsed.note,
+                writePosition: card.idWriteOffset,
+                startOffset: card.startOffset,
+                hasAnchor: card.hasAnchor
+            })
+            if (parsed.identifier == null) {
+                this.structured_notes_to_add.push(parsed.note)
+                this.structured_id_indexes.push(card.idWriteOffset)
+            } else if (!this.data.EXISTING_IDS.includes(parsed.identifier)) {
+                console.warn("Note with id", parsed.identifier, " in file ", this.path, " does not exist in Anki!")
+                this.structured_notes_to_add.push(parsed.note)
+                this.structured_id_indexes.push(card.idWriteOffset)
+            } else {
+                this.notes_to_edit.push(parsed)
+            }
+        }
+    }
+
     hasRequiredTag(tags_str: string): boolean {
         if (!tags_str || tags_str.trim().length === 0) return true;
 
@@ -618,6 +680,9 @@ export class AllFile extends AbstractFile {
         this.setupScan()
         this.scanNotes()
         this.scanInlineNotes()
+        if (this.data.structured_parser && this.data.structured_note_type) {
+            this.scanStructured()
+        }
 
         const noteTypes = Object.keys(this.custom_regexps);
         // Sort note types: prioritizes those with required tags ONLY if enabled
@@ -636,6 +701,9 @@ export class AllFile extends AbstractFile {
         }
 
         for (let note_type of noteTypes) {
+            if (this.data.structured_parser && this.data.structured_note_type === note_type) {
+                continue;
+            }
             const regexp_str: string = this.custom_regexps[note_type]
             if (regexp_str) {
                 // Check for required tags
@@ -650,11 +718,11 @@ export class AllFile extends AbstractFile {
         }
         this.scanDeletions()
         this.postProcessFrontmatterID()
-        this.all_notes_to_add = this.notes_to_add.concat(this.inline_notes_to_add).concat(this.regex_notes_to_add)
+        this.all_notes_to_add = this.notes_to_add.concat(this.inline_notes_to_add).concat(this.regex_notes_to_add).concat(this.structured_notes_to_add)
     }
 
     postProcessFrontmatterID() {
-        const totalNotes = this.notes_to_add.length + this.inline_notes_to_add.length + this.regex_notes_to_add.length + this.notes_to_edit.length;
+        const totalNotes = this.notes_to_add.length + this.inline_notes_to_add.length + this.regex_notes_to_add.length + this.structured_notes_to_add.length + this.notes_to_edit.length;
 
         // If strictly one note AND settings enabled, use Frontmatter ID
         if (this.data.saveIDToFrontmatter && totalNotes === 1) {
@@ -832,6 +900,25 @@ export class AllFile extends AbstractFile {
                     }
                 }
             )
+            this.structured_id_indexes.forEach(
+                (id_position: number, index: number) => {
+                    const identifier: number | null = this.note_ids[index + this.notes_to_add.length + this.inline_notes_to_add.length + this.regex_notes_to_add.length]
+                    if (identifier) {
+                        const metadata = this.data.structured_context_link_field
+                            ? `\n${anchor_to_str(identifier).trim()}\n${id_to_str(identifier, false, this.data.comment).trim()}`
+                            : "\n" + id_to_str(identifier, false, this.data.comment).trim()
+                        edits.push({ start: id_position, end: id_position, text: metadata })
+                    }
+                }
+            )
+            for (let entry of this.structured_writebacks) {
+                const identifier = this.getStructuredIdentifierForNote(entry.note)
+                const isExistingStructured = this.structured_notes_to_add.indexOf(entry.note) === -1
+                if (!identifier || !isExistingStructured) continue
+                if (!this.data.structured_context_link_field) continue
+                if (entry.hasAnchor) continue
+                edits.push({ start: entry.writePosition, end: entry.writePosition, text: `\n${anchor_to_str(identifier).trim()}` })
+            }
         }
 
         this.file = apply_edits(this.file, edits)
@@ -842,5 +929,36 @@ export class AllFile extends AbstractFile {
         if (!this.useFrontmatterID) {
             this.fix_newline_ids()
         }
+    }
+
+    getStructuredIdentifierForNote(note: AnkiConnectNote): number | null {
+        const edited = this.notes_to_edit.find(parsed => parsed.note === note)
+        if (edited?.identifier) {
+            return edited.identifier
+        }
+        const structuredAddIndex = this.structured_notes_to_add.indexOf(note)
+        if (structuredAddIndex === -1) {
+            return null
+        }
+        const noteIdIndex = structuredAddIndex + this.notes_to_add.length + this.inline_notes_to_add.length + this.regex_notes_to_add.length
+        return this.note_ids[noteIdIndex] ?? null
+    }
+
+    getStructuredContextLinkUpdates(): AnkiConnect.AnkiConnectRequest[] {
+        const contextLinkField = this.data.structured_context_link_field || ""
+        if (!contextLinkField) {
+            return []
+        }
+        let actions: AnkiConnect.AnkiConnectRequest[] = []
+        for (let entry of this.structured_writebacks) {
+            const identifier = this.getStructuredIdentifierForNote(entry.note)
+            if (!identifier) continue
+            const blockId = `anki-${identifier}`
+            const uri = this.formatter.getAdvancedUriForBlock(this.path, blockId)
+            const fieldValue = `<a href="${uri}" class="obsidian-link">Open card</a>`
+            entry.note.fields[contextLinkField] = fieldValue
+            actions.push(AnkiConnect.updateNoteFields(identifier, { [contextLinkField]: fieldValue }))
+        }
+        return actions
     }
 }

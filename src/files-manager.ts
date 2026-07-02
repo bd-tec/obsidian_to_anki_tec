@@ -329,6 +329,12 @@ export class FileManager {
         }
         requests.push(AnkiConnect.multi(temp))
         temp = []
+        console.info("Requesting structured context link updates...")
+        for (let file of this.ownFiles) {
+            temp.push(...file.getStructuredContextLinkUpdates())
+        }
+        requests.push(AnkiConnect.multi(temp))
+        temp = []
         await AnkiConnect.invoke('multi', { actions: requests })
         console.info("All done!")
     }

@@ -8,6 +8,42 @@ function folderPathToIgnoreGlob(path: string): string {
     return `${path.replace(/\/+$/, '')}/**`
 }
 
+function parseSectionFieldMap(raw: string): Record<string, string> {
+    const result: Record<string, string> = {}
+    if (!raw) return result
+    for (let line of raw.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        const separatorIndex = trimmed.includes('=>') ? trimmed.indexOf('=>') : trimmed.indexOf('=')
+        if (separatorIndex === -1) continue
+        const label = trimmed.slice(0, separatorIndex).trim()
+        const field = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim()
+        if (!label || !field) continue
+        result[label] = field
+    }
+    return result
+}
+
+function filterSectionFieldMap(
+    mapping: Record<string, string>,
+    availableFields: string[],
+    frontField: string,
+    backField: string,
+    fileLinkField: string,
+    contextField: string,
+    contextLinkField: string
+): Record<string, string> {
+    const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean))
+    const allowed = new Set(availableFields.filter(field => !reserved.has(field)))
+    const filtered: Record<string, string> = {}
+    for (let [label, field] of Object.entries(mapping)) {
+        if (allowed.has(field)) {
+            filtered[label] = field
+        }
+    }
+    return filtered
+}
+
 export async function settingToData(app: App, settings: PluginSettings, fields_dict: Record<string, string[]>): Promise<ParsedSettings> {
     let result: ParsedSettings = <ParsedSettings>{}
 
@@ -63,5 +99,24 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
         .map(folderPathToIgnoreGlob)
     result.ignored_file_globs = [...(settings.IGNORED_FILE_GLOBS ?? []), ...excludedFolders];
     result.saveIDToFrontmatter = settings.Defaults["Save Note ID to Frontmatter"];
+    result.structured_parser = settings.Defaults["Structured Parser"] ?? false;
+    result.structured_note_type = settings.Defaults["Structured Parser - Note Type"] ?? "";
+    result.structured_separator = settings.Defaults["Structured Parser - Front Back Separator"] ?? "? #flashcard";
+    result.structured_card_end = settings.Defaults["Structured Parser - Card End Marker"] ?? "---";
+    result.structured_include_heading_level = settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0;
+    result.structured_front_field = settings.Defaults["Structured Parser - Front Field"] ?? "";
+    result.structured_back_field = settings.Defaults["Structured Parser - Back Field"] ?? "";
+    result.structured_file_link_field = settings.Defaults["Structured Parser - File Link Field"] ?? "";
+    result.structured_context_field = settings.Defaults["Structured Parser - Context Field"] ?? "";
+    result.structured_context_link_field = settings.Defaults["Structured Parser - Context Link Field"] ?? "";
+    result.structured_section_field_map = filterSectionFieldMap(
+        parseSectionFieldMap(settings.Defaults["Structured Parser - Section Field Map"] ?? ""),
+        fields_dict[result.structured_note_type] ?? [],
+        result.structured_front_field,
+        result.structured_back_field,
+        result.structured_file_link_field,
+        result.structured_context_field,
+        result.structured_context_link_field
+    );
     return result
 }
