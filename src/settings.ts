@@ -95,6 +95,40 @@ export class SettingsTab extends PluginSettingTab {
 		this.setupStructuredParserTab()
 	}
 
+	private createSectionHeader(
+		container: HTMLElement,
+		title: string,
+		options?: {
+			description?: string,
+			level?: 'h3' | 'h4',
+			extraDescriptions?: string[]
+		}
+	) {
+		const wrapper = container.createDiv({ cls: 'anki-settings-header' })
+		const info = wrapper.createDiv({ cls: 'anki-settings-header-info' })
+		const level = options?.level || 'h3'
+		const titleCls = level === 'h4'
+			? 'anki-settings-header-title anki-settings-header-title-small'
+			: 'anki-settings-header-title'
+		info.createDiv({
+			text: title,
+			cls: titleCls
+		})
+		if (options?.description) {
+			info.createDiv({
+				text: options.description,
+				cls: 'anki-settings-header-description'
+			})
+		}
+		for (const text of options?.extraDescriptions || []) {
+			info.createDiv({
+				text,
+				cls: 'anki-settings-header-description'
+			})
+		}
+		return wrapper
+	}
+
 	private setupGeneralTab() {
 		const container = this.tabContainer.getTabContent('general')
 		if (!container) return
@@ -102,7 +136,7 @@ export class SettingsTab extends PluginSettingTab {
 		const plugin = (this as any).plugin
 
 		// Defaults section
-		container.createEl('h3', { text: 'Default Settings' })
+		this.createSectionHeader(container, 'Default Settings')
 
 		// Scan Directory with Folder Picker
 		const scanDirSetting = new Setting(container)
@@ -143,11 +177,11 @@ export class SettingsTab extends PluginSettingTab {
 		this.addDefaultSettings(container, plugin)
 
 		// Tag Settings section
-		container.createEl('h3', { text: 'Tag Settings', cls: 'anki-settings-section' })
+		this.createSectionHeader(container, 'Tag Settings')
 		this.addTagSettings(container, plugin)
 
 		// Show Status Bar setting
-		container.createEl('h3', { text: 'Other Settings', cls: 'anki-settings-section' })
+		this.createSectionHeader(container, 'Other Settings')
 		new Setting(container)
 			.setName("Show Status Bar")
 			.setDesc(defaultDescs["Show Status Bar"])
@@ -161,7 +195,7 @@ export class SettingsTab extends PluginSettingTab {
 			)
 
 		// Ignored Files section
-		container.createEl('h3', { text: 'Ignored Files & Folders', cls: 'anki-settings-section' })
+		this.createSectionHeader(container, 'Ignored Files & Folders')
 		this.setup_ignore_files(container, plugin)
 	}
 
@@ -508,10 +542,8 @@ export class SettingsTab extends PluginSettingTab {
 		const enableAliases = plugin.settings.Defaults["Add Aliases"];
 
 
-		container.createEl('h3', { text: 'Note Type Configuration' })
-		container.createEl('p', {
-			text: 'Configure custom regular expressions and field mappings for each Anki note type.',
-			cls: 'setting-item-description'
+		this.createSectionHeader(container, 'Note Type Configuration', {
+			description: 'Configure custom regular expressions and field mappings for each Anki note type.'
 		})
 
 		// Create searchable table
@@ -1012,10 +1044,8 @@ export class SettingsTab extends PluginSettingTab {
 
 		const plugin = (this as any).plugin
 
-		container.createEl('h3', { text: 'Folder Configuration' })
-		container.createEl('p', {
-			text: 'Add only the folder rules you need. Folder deck and tag rules apply to files within matching folders.',
-			cls: 'setting-item-description'
+		this.createSectionHeader(container, 'Folder Configuration', {
+			description: 'Add only the folder rules you need. Folder deck and tag rules apply to files within matching folders.'
 		})
 
 		if (!(plugin.settings.hasOwnProperty("FOLDER_DECKS"))) {
@@ -1043,10 +1073,8 @@ export class SettingsTab extends PluginSettingTab {
 
 		const plugin = (this as any).plugin
 
-		container.createEl('h3', { text: 'Syntax Settings' })
-		container.createEl('p', {
-			text: 'Customize the syntax markers used to identify flashcards in your notes.',
-			cls: 'setting-item-description'
+		this.createSectionHeader(container, 'Syntax Settings', {
+			description: 'Customize the syntax markers used to identify flashcards in your notes.'
 		})
 
 		for (let key of Object.keys(plugin.settings["Syntax"])) {
@@ -1068,16 +1096,16 @@ export class SettingsTab extends PluginSettingTab {
 
 		const plugin = (this as any).plugin
 
-		container.createEl('h3', { text: 'Actions' })
+		this.createSectionHeader(container, 'Actions')
 
 
 		this.setup_buttons(container, plugin)
 
 
-		container.createEl('h3', { text: 'Import/Export Settings', cls: 'anki-settings-section' })
+		this.createSectionHeader(container, 'Import/Export Settings')
 		this.setup_import_export(container, plugin)
 
-		container.createEl('h3', { text: 'Experimental Features', cls: 'anki-settings-section' })
+		this.createSectionHeader(container, 'Experimental Features')
 
 		new Setting(container)
 			.setName("AnkiConnect API Key")
@@ -1185,10 +1213,8 @@ export class SettingsTab extends PluginSettingTab {
 				})
 			)
 
-		container.createEl('h3', { text: 'Orphan Recovery', cls: 'anki-settings-section' })
-		container.createEl('p', {
-			text: "When a card's Anki ID no longer exists in Anki, these settings control how the plugin recovers.",
-			cls: 'setting-item-description'
+		this.createSectionHeader(container, 'Orphan Recovery', {
+			description: "When a card's Anki ID no longer exists in Anki, these settings control how the plugin recovers."
 		})
 		new Setting(container)
 			.setName("Auto Re-link by Content")
@@ -1201,10 +1227,8 @@ export class SettingsTab extends PluginSettingTab {
 				})
 			)
 		
-		container.createEl('h3', { text: 'Structured Parser', cls: 'anki-settings-section' })
-		container.createEl('p', {
-			text: 'An alternative to custom regex that splits cards by configurable markers.',
-			cls: 'setting-item-description'
+		this.createSectionHeader(container, 'Structured Parser', {
+			description: 'An alternative to custom regex that splits cards by configurable markers.'
 		})
 		new Setting(container)
 			.setName("Enable Structured Parser")
@@ -1228,17 +1252,12 @@ export class SettingsTab extends PluginSettingTab {
 		const selectedNoteType = plugin.settings.Defaults["Structured Parser - Note Type"] || ""
 		const availableFields = selectedNoteType ? (plugin.fields_dict[selectedNoteType] || []) : []
 
-		container.createEl('h3', { text: 'Structured Parser' })
-		container.createEl('p', {
-			text: 'An alternative to custom regex that splits cards by configurable markers.',
-			cls: 'setting-item-description'
-		})
-		container.createEl('p', {
-			text: 'To disable this, turn off Enable Structured Parser in Advanced.',
-			cls: 'setting-item-description'
+		this.createSectionHeader(container, 'Structured Parser', {
+			description: 'An alternative to custom regex that splits cards by configurable markers.',
+			extraDescriptions: ['To disable this, turn off Enable Structured Parser in Advanced.']
 		})
 
-		container.createEl('h4', { text: 'Main Fields', cls: 'anki-settings-section' })
+		this.createSectionHeader(container, 'Main Fields', { level: 'h4' })
 		new Setting(container)
 			.setName("Note Type")
 			.setDesc(defaultDescs["Structured Parser - Note Type"])
@@ -1310,7 +1329,7 @@ export class SettingsTab extends PluginSettingTab {
 				})
 		}
 
-		container.createEl('h4', { text: 'Card Boundaries', cls: 'anki-settings-section' })
+		this.createSectionHeader(container, 'Card Boundaries', { level: 'h4' })
 		new Setting(container)
 			.setName("Front/Back Separator")
 			.setDesc(defaultDescs["Structured Parser - Front Back Separator"])
@@ -1353,7 +1372,7 @@ export class SettingsTab extends PluginSettingTab {
 			})
 
 		if (availableFields.length > 0) {
-			container.createEl('h4', { text: 'Auto Fields', cls: 'anki-settings-section' })
+			this.createSectionHeader(container, 'Auto Fields', { level: 'h4' })
 			new Setting(container)
 				.setName("File Link Field")
 				.setDesc(defaultDescs["Structured Parser - File Link Field"])
@@ -1402,7 +1421,7 @@ export class SettingsTab extends PluginSettingTab {
 						this.display()
 					})
 				})
-			container.createEl('h4', { text: 'Extra Section Routing', cls: 'anki-settings-section' })
+			this.createSectionHeader(container, 'Extra Section Routing', { level: 'h4' })
 			this.renderSectionFieldMapEditor(container, plugin, availableFields)
 		}
 	}
