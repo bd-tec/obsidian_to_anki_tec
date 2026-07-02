@@ -65,7 +65,18 @@ export default class MyPlugin extends Plugin {
 				"Render Clozes - Highlight": false,
 				"Cloze Deletion Context Menu": false,
 				"Show Status Bar": true,
-				"AnkiConnect API Key": ""
+				"AnkiConnect API Key": "",
+				"Structured Parser": false,
+				"Structured Parser - Note Type": "",
+				"Structured Parser - Front Back Separator": "? #flashcard",
+				"Structured Parser - Card End Marker": "---",
+				"Structured Parser - Include From Heading Level": 0,
+				"Structured Parser - Front Field": "",
+				"Structured Parser - Back Field": "",
+				"Structured Parser - File Link Field": "",
+				"Structured Parser - Context Field": "",
+				"Structured Parser - Context Link Field": "",
+				"Structured Parser - Section Field Map": ""
 			},
 			IGNORED_FILE_GLOBS: DEFAULT_IGNORED_FILE_GLOBS,
 		}

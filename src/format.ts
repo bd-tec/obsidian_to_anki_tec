@@ -57,6 +57,15 @@ export class FormatConverter {
 		return "obsidian://open?vault=" + encodeURIComponent(this.vault_name) + String.raw`&file=` + encodeURIComponent(link)
 	}
 
+	getAdvancedUriForBlock(filepath: string, block: string): string {
+		return "obsidian://advanced-uri?vault="
+			+ encodeURIComponent(this.vault_name)
+			+ "&filepath="
+			+ encodeURIComponent(filepath)
+			+ "&block="
+			+ encodeURIComponent(block)
+	}
+
 	format_note_with_url(note: AnkiConnectNote, url: string, field: string, link_label: string = "Obsidian", filename: string = ""): void {
 		let prefix = note.fields[field] ? '<br>' : '';
 		let link_text = link_label;
