@@ -201,3 +201,66 @@
 .anki-vertical-setting .setting-item-control textarea {
   width: 100%;
 }
+
+.anki-folder-rule-editor {
+  margin-bottom: 16px;
+}
+
+.anki-folder-rule-editor summary {
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.anki-folder-rule-editor-body {
+  padding-left: 8px;
+}
+
+.anki-folder-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.anki-folder-rule-item {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--background-primary-alt);
+}
+
+.anki-folder-rule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.anki-folder-rule-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.anki-folder-rule-value-row {
+  margin-bottom: 0;
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.anki-folder-rule-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.anki-folder-rule-input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .anki-folder-rule-row,
+  .anki-folder-rule-value-row {
+    grid-template-columns: 1fr;
+  }
+}

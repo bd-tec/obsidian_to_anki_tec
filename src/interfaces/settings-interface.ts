@@ -9,6 +9,8 @@ export interface PluginSettings {
 	ALIAS_FIELDS: Record<string, string>,
 	FOLDER_DECKS: Record<string, string>,
 	FOLDER_TAGS: Record<string, string>,
+	SCAN_DIRECTORIES: string[],
+	EXCLUDED_FOLDERS: string[],
 	Syntax: {
 		"Begin Note": string,
 		"End Note": string,

@@ -503,26 +503,308 @@ export class SettingsTab extends PluginSettingTab {
 		}
 	}
 
+	getFolderRules(record: Record<string, string>): { path: string, value: string }[] {
+		return Object.entries(record)
+			.map(([path, value]) => ({ path, value }))
+			.filter(rule => rule.path.trim().length > 0 && rule.value.trim().length > 0)
+			.sort((a, b) => a.path.localeCompare(b.path))
+	}
+
+	getScanFolderRules(paths: string[]): { path: string }[] {
+		return (paths || [])
+			.map(path => ({ path }))
+			.filter(rule => rule.path.trim().length > 0)
+			.sort((a, b) => a.path.localeCompare(b.path))
+	}
+
+	saveScanFolderRules(plugin: any, rules: { path: string }[]) {
+		plugin.settings.SCAN_DIRECTORIES = rules
+			.map(rule => rule.path.trim())
+			.filter(path => path.length > 0)
+		plugin.saveAllData()
+	}
+
+	saveFolderRules(plugin: any, key: string, rules: { path: string, value: string }[]) {
+		const next: Record<string, string> = {}
+		for (let rule of rules) {
+			const path = rule.path.trim()
+			const value = rule.value.trim()
+			if (!path || !value) continue
+			next[path] = value
+		}
+		plugin.settings[key] = next
+		plugin.saveAllData()
+	}
+
+	renderFolderRuleEditor(container: HTMLElement, plugin: any, key: string, title: string, description: string, valuePlaceholder: string) {
+		const rules = this.getFolderRules(plugin.settings[key] || {})
+		const detailsEl = container.createEl('details', { cls: 'anki-folder-rule-editor' })
+		detailsEl.open = true
+		const summaryEl = detailsEl.createEl('summary', { text: `${title} (${rules.length})` })
+		summaryEl.addClass('setting-item-name')
+		const wrapper = detailsEl.createDiv({ cls: "anki-folder-rule-editor-body" })
+		const allFolders = getAllFolders(this.app)
+
+		new Setting(wrapper)
+			.setName(title)
+			.setDesc(description)
+			.addButton(button => {
+				button
+					.setButtonText("+")
+					.setTooltip(`Add ${title.toLowerCase()} rule`)
+					.onClick(() => {
+						rules.push({ path: "", value: "" })
+						this.saveFolderRules(plugin, key, rules)
+						renderRules()
+					})
+			})
+
+		const listEl = wrapper.createDiv({ cls: "anki-folder-rule-list" })
+		const renderRules = () => {
+			summaryEl.setText(`${title} (${rules.length})`)
+			listEl.empty()
+			if (rules.length === 0) {
+				listEl.createEl('div', {
+					text: "No folder rules added yet.",
+					cls: 'setting-item-description'
+				})
+				return
+			}
+
+			rules.forEach((rule, index) => {
+				const ruleEl = listEl.createDiv({ cls: 'anki-folder-rule-item' })
+				const headerEl = ruleEl.createDiv({ cls: 'anki-folder-rule-header' })
+				headerEl.createEl('div', {
+					text: `Rule ${index + 1}`,
+					cls: 'setting-item-name'
+				})
+				const removeButton = headerEl.createEl('button', { text: 'Remove' })
+				removeButton.addEventListener('click', () => {
+					rules.splice(index, 1)
+					this.saveFolderRules(plugin, key, rules)
+					renderRules()
+				})
+
+				const pathRow = ruleEl.createDiv({ cls: 'anki-folder-rule-row' })
+				pathRow.createEl('label', {
+					text: 'Folder',
+					cls: 'anki-folder-rule-label'
+				})
+				const pathInput = pathRow.createEl('input', {
+					type: 'text',
+					placeholder: 'Folder path',
+					value: rule.path
+				})
+				pathInput.addClass('anki-folder-rule-input')
+				pathInput.addEventListener('change', () => {
+					rules[index].path = pathInput.value
+					this.saveFolderRules(plugin, key, rules)
+				})
+				const browseButton = pathRow.createEl('button', { text: 'Browse' })
+				browseButton.addClass('anki-folder-picker-btn')
+				browseButton.addEventListener('click', () => {
+					new FolderSuggestModal(this.app, allFolders, (folder) => {
+						rules[index].path = folder.path
+						this.saveFolderRules(plugin, key, rules)
+						renderRules()
+					}).open()
+				})
+				browseButton.setText('Browse')
+
+				const valueRow = ruleEl.createDiv({ cls: 'anki-folder-rule-row' })
+				valueRow.addClass('anki-folder-rule-value-row')
+				valueRow.createEl('label', {
+					text: key === "FOLDER_DECKS" ? 'Deck' : 'Tags',
+					cls: 'anki-folder-rule-label'
+				})
+				const valueInput = valueRow.createEl('input', {
+					type: 'text',
+					placeholder: valuePlaceholder,
+					value: rule.value
+				})
+				valueInput.addClass('anki-folder-rule-input')
+				valueInput.addEventListener('change', () => {
+					rules[index].value = valueInput.value
+					this.saveFolderRules(plugin, key, rules)
+				})
+			})
+		}
+		renderRules()
+	}
+
+	renderScanFolderEditor(container: HTMLElement, plugin: any) {
+		const rules = this.getScanFolderRules(plugin.settings.SCAN_DIRECTORIES || [])
+		const detailsEl = container.createEl('details', { cls: 'anki-folder-rule-editor' })
+		detailsEl.open = false
+		const summaryEl = detailsEl.createEl('summary', { text: `Additional Scan Folders (${rules.length})` })
+		summaryEl.addClass('setting-item-name')
+		const wrapper = detailsEl.createDiv({ cls: "anki-folder-rule-editor-body" })
+		const allFolders = getAllFolders(this.app)
+
+		new Setting(wrapper)
+			.setName("Additional Scan Folders")
+			.setDesc("Include more folders in vault-wide sync without changing the main Scan Directory setting.")
+			.addButton(button => {
+				button
+					.setButtonText("+")
+					.setTooltip("Add scan folder")
+					.onClick(() => {
+						rules.push({ path: "" })
+						this.saveScanFolderRules(plugin, rules)
+						renderRules()
+					})
+			})
+
+		const listEl = wrapper.createDiv({ cls: "anki-folder-rule-list" })
+		const renderRules = () => {
+			summaryEl.setText(`Additional Scan Folders (${rules.length})`)
+			listEl.empty()
+			if (rules.length === 0) {
+				listEl.createEl('div', {
+					text: "No additional scan folders added yet.",
+					cls: 'setting-item-description'
+				})
+				return
+			}
+
+			rules.forEach((rule, index) => {
+				const ruleEl = listEl.createDiv({ cls: 'anki-folder-rule-item' })
+				const headerEl = ruleEl.createDiv({ cls: 'anki-folder-rule-header' })
+				headerEl.createEl('div', {
+					text: `Folder ${index + 1}`,
+					cls: 'setting-item-name'
+				})
+				const removeButton = headerEl.createEl('button', { text: 'Remove' })
+				removeButton.addEventListener('click', () => {
+					rules.splice(index, 1)
+					this.saveScanFolderRules(plugin, rules)
+					renderRules()
+				})
+
+				const pathRow = ruleEl.createDiv({ cls: 'anki-folder-rule-row' })
+				pathRow.createEl('label', {
+					text: 'Folder',
+					cls: 'anki-folder-rule-label'
+				})
+				const pathInput = pathRow.createEl('input', {
+					type: 'text',
+					placeholder: 'Folder path',
+					value: rule.path
+				})
+				pathInput.addClass('anki-folder-rule-input')
+				pathInput.addEventListener('change', () => {
+					rules[index].path = pathInput.value
+					this.saveScanFolderRules(plugin, rules)
+				})
+				const browseButton = pathRow.createEl('button', { text: 'Browse' })
+				browseButton.addClass('anki-folder-picker-btn')
+				browseButton.addEventListener('click', () => {
+					new FolderSuggestModal(this.app, allFolders, (folder) => {
+						rules[index].path = folder.path
+						this.saveScanFolderRules(plugin, rules)
+						renderRules()
+					}).open()
+				})
+			})
+		}
+		renderRules()
+	}
+
+	renderExcludedFolderEditor(container: HTMLElement, plugin: any) {
+		const rules = this.getScanFolderRules(plugin.settings.EXCLUDED_FOLDERS || [])
+		const detailsEl = container.createEl('details', { cls: 'anki-folder-rule-editor' })
+		detailsEl.open = false
+		const summaryEl = detailsEl.createEl('summary', { text: `Excluded Folders (${rules.length})` })
+		summaryEl.addClass('setting-item-name')
+		const wrapper = detailsEl.createDiv({ cls: "anki-folder-rule-editor-body" })
+		const allFolders = getAllFolders(this.app)
+		const saveRules = () => {
+			plugin.settings.EXCLUDED_FOLDERS = rules
+				.map(rule => rule.path.trim())
+				.filter(path => path.length > 0)
+			plugin.saveAllData()
+		}
+
+		new Setting(wrapper)
+			.setName("Excluded Folders")
+			.setDesc("Exclude specific folders from sync without writing raw glob patterns.")
+			.addButton(button => {
+				button
+					.setButtonText("+")
+					.setTooltip("Add excluded folder")
+					.onClick(() => {
+						rules.push({ path: "" })
+						saveRules()
+						renderRules()
+					})
+			})
+
+		const listEl = wrapper.createDiv({ cls: "anki-folder-rule-list" })
+		const renderRules = () => {
+			summaryEl.setText(`Excluded Folders (${rules.length})`)
+			listEl.empty()
+			if (rules.length === 0) {
+				listEl.createEl('div', {
+					text: "No excluded folders added yet.",
+					cls: 'setting-item-description'
+				})
+				return
+			}
+
+			rules.forEach((rule, index) => {
+				const ruleEl = listEl.createDiv({ cls: 'anki-folder-rule-item' })
+				const headerEl = ruleEl.createDiv({ cls: 'anki-folder-rule-header' })
+				headerEl.createEl('div', {
+					text: `Folder ${index + 1}`,
+					cls: 'setting-item-name'
+				})
+				const removeButton = headerEl.createEl('button', { text: 'Remove' })
+				removeButton.addEventListener('click', () => {
+					rules.splice(index, 1)
+					saveRules()
+					renderRules()
+				})
+
+				const pathRow = ruleEl.createDiv({ cls: 'anki-folder-rule-row' })
+				pathRow.createEl('label', {
+					text: 'Folder',
+					cls: 'anki-folder-rule-label'
+				})
+				const pathInput = pathRow.createEl('input', {
+					type: 'text',
+					placeholder: 'Folder path',
+					value: rule.path
+				})
+				pathInput.addClass('anki-folder-rule-input')
+				pathInput.addEventListener('change', () => {
+					rules[index].path = pathInput.value
+					saveRules()
+				})
+				const browseButton = pathRow.createEl('button', { text: 'Browse' })
+				browseButton.addClass('anki-folder-picker-btn')
+				browseButton.addEventListener('click', () => {
+					new FolderSuggestModal(this.app, allFolders, (folder) => {
+						rules[index].path = folder.path
+						saveRules()
+						renderRules()
+					}).open()
+				})
+			})
+		}
+		renderRules()
+	}
+
 	private setupFoldersTab() {
 		const container = this.tabContainer.getTabContent('folders')
 		if (!container) return
 
 		const plugin = (this as any).plugin
-		const folder_list = this.get_folders()
 
 		container.createEl('h3', { text: 'Folder Configuration' })
 		container.createEl('p', {
-			text: 'Set custom decks and tags for specific folders. These settings apply to all files within the folder.',
+			text: 'Add only the folder rules you need. Folder deck and tag rules apply to files within matching folders.',
 			cls: 'setting-item-description'
 		})
-
-		// Create searchable table
-		const tableContainer = container.createDiv()
-		const searchableTable = new SearchableTable(
-			tableContainer,
-			['Folder', 'Folder Deck', 'Folder Tags'],
-			'Search folders...'
-		)
 
 		if (!(plugin.settings.hasOwnProperty("FOLDER_DECKS"))) {
 			plugin.settings.FOLDER_DECKS = {}
@@ -530,19 +812,17 @@ export class SettingsTab extends PluginSettingTab {
 		if (!(plugin.settings.hasOwnProperty("FOLDER_TAGS"))) {
 			plugin.settings.FOLDER_TAGS = {}
 		}
-
-		for (let folder of folder_list) {
-			const row = searchableTable.addRow()
-			const cells: HTMLTableCellElement[] = []
-
-			for (let i = 0; i < 3; i++) {
-				cells.push(searchableTable.insertCell(row))
-			}
-
-			cells[0].innerHTML = folder.path
-			this.setup_folder_deck(folder, cells, plugin)
-			this.setup_folder_tag(folder, cells, plugin)
+		if (!(plugin.settings.hasOwnProperty("SCAN_DIRECTORIES"))) {
+			plugin.settings.SCAN_DIRECTORIES = []
 		}
+		if (!(plugin.settings.hasOwnProperty("EXCLUDED_FOLDERS"))) {
+			plugin.settings.EXCLUDED_FOLDERS = []
+		}
+
+		this.renderScanFolderEditor(container, plugin)
+		this.renderExcludedFolderEditor(container, plugin)
+		this.renderFolderRuleEditor(container, plugin, "FOLDER_DECKS", "Folder Deck Rules", "Set target decks for specific folders.", "Deck name")
+		this.renderFolderRuleEditor(container, plugin, "FOLDER_TAGS", "Folder Tag Rules", "Add Anki tags for specific folders.", "tag1, tag2")
 	}
 
 	private setupSyntaxTab() {
