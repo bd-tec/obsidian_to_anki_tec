@@ -28,6 +28,8 @@ export default class MyPlugin extends Plugin {
 			ALIAS_FIELDS: {},
 			FOLDER_DECKS: {},
 			FOLDER_TAGS: {},
+			SCAN_DIRECTORIES: [],
+			EXCLUDED_FOLDERS: [],
 			Syntax: {
 				"Begin Note": "START",
 				"End Note": "END",
@@ -284,6 +286,45 @@ export default class MyPlugin extends Plugin {
 		await this.syncFiles(null, "vault")
 	}
 
+	getConfiguredScanFiles(): TFile[] {
+		const configuredPaths = new Set<string>()
+		const primaryScanDir = (this.settings.Defaults["Scan Directory"] || "").trim()
+		if (primaryScanDir) {
+			configuredPaths.add(primaryScanDir)
+		}
+		for (let path of (this.settings.SCAN_DIRECTORIES || [])) {
+			const trimmed = path.trim()
+			if (trimmed) {
+				configuredPaths.add(trimmed)
+			}
+		}
+		if (configuredPaths.size === 0) {
+			return this.app.vault.getMarkdownFiles()
+		}
+
+		const filesByPath = new Map<string, TFile>()
+		const invalidPaths: string[] = []
+		for (let folderPath of configuredPaths) {
+			const abstractFile = this.app.vault.getAbstractFileByPath(folderPath)
+			if (!(abstractFile instanceof TFolder)) {
+				invalidPaths.push(folderPath)
+				continue
+			}
+			console.info("Using configured scan folder: " + abstractFile.path)
+			for (let file of this.getAllTFilesInFolder(abstractFile)) {
+				filesByPath.set(file.path, file)
+			}
+		}
+
+		if (filesByPath.size === 0 && invalidPaths.length > 0) {
+			throw new Error(`Invalid scan folder path(s): ${invalidPaths.join(", ")}`)
+		}
+		if (invalidPaths.length > 0) {
+			new Notice(`Skipped invalid scan folder path(s): ${invalidPaths.join(", ")}`)
+		}
+		return Array.from(filesByPath.values())
+	}
+
 	async syncCurrentFile() {
 		const activeFile = this.app.workspace.getActiveFile()
 		if (!activeFile) {
@@ -353,22 +394,7 @@ export default class MyPlugin extends Plugin {
 
 			let filesToSync: TFile[]
 			if (files === null) {
-				// Scan vault or custom directory
-				const scanDir = this.app.vault.getAbstractFileByPath(this.settings.Defaults["Scan Directory"])
-				if (scanDir !== null) {
-					if (scanDir instanceof TFolder) {
-						console.info("Using custom scan directory: " + scanDir.path)
-						filesToSync = this.getAllTFilesInFolder(scanDir)
-					} else {
-						new Notice("Error: incorrect path for scan directory")
-						progressModal.close()
-						this.isSyncing = false
-						this.updateStatusBar("error")
-						return
-					}
-				} else {
-					filesToSync = this.app.vault.getMarkdownFiles()
-				}
+				filesToSync = this.getConfiguredScanFiles()
 				// Filter by Scan Tags
 				const scanTagsSetting = this.settings.Defaults["Scan Tags"]
 				if (scanTagsSetting && scanTagsSetting.trim().length > 0) {

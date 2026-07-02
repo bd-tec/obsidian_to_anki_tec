@@ -4,6 +4,10 @@ import * as AnkiConnect from './anki'
 import { ID_REGEXP_STR } from './note'
 import { escapeRegex } from './constants'
 
+function folderPathToIgnoreGlob(path: string): string {
+    return `${path.replace(/\/+$/, '')}/**`
+}
+
 export async function settingToData(app: App, settings: PluginSettings, fields_dict: Record<string, string[]>): Promise<ParsedSettings> {
     let result: ParsedSettings = <ParsedSettings>{}
 
@@ -53,8 +57,11 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     result.yaml_tags = settings.Defaults["Add Frontmatter Tags"]
     result.regex_required_tags = settings.Defaults["Regex Required Tags"]
     result.link_label = settings.Defaults["Add File Link - Link Label"];
-    result.ignored_file_globs = settings.IGNORED_FILE_GLOBS ?? [];
-    result.ignored_file_globs = settings.IGNORED_FILE_GLOBS ?? [];
+    const excludedFolders = (settings.EXCLUDED_FOLDERS ?? [])
+        .map(path => path.trim())
+        .filter(path => path.length > 0)
+        .map(folderPathToIgnoreGlob)
+    result.ignored_file_globs = [...(settings.IGNORED_FILE_GLOBS ?? []), ...excludedFolders];
     result.saveIDToFrontmatter = settings.Defaults["Save Note ID to Frontmatter"];
     return result
 }
