@@ -92,6 +92,18 @@ Usage:
 - right-click a folder to sync that folder directly
 - useful when you prefer the file explorer over the command palette
 
+### Cloze editor commands
+
+The plugin also adds editor commands for cloze creation and removal.
+
+Enable: No extra toggle is required for the command palette versions. The context menu variant uses the separate **Cloze Deletion Context Menu** setting.
+
+Usage:
+
+- `Add Anki Cloze` wraps the current selection as an Anki cloze
+- `Remove Anki Cloze` removes cloze markup when the cursor is inside a cloze
+- useful when editing cloze cards directly in Markdown
+
 ## General Features
 
 ### Add File Link
@@ -192,6 +204,18 @@ Usage:
 
 ## Tags and Scan Controls
 
+### Scan Directory
+
+This sets the main folder scope for vault-wide sync.
+
+Enable: Go to **Settings -> General -> Scan Directory** and choose a folder, or leave it blank for the full vault.
+
+Usage:
+
+- blank means the plugin can scan the entire vault
+- setting a folder limits normal vault scans to that subtree
+- useful when only one part of a vault contains Anki notes
+
 ### Add Inline Tags
 
 This sends inline Obsidian tags to Anki.
@@ -264,6 +288,30 @@ Example:
 Templates/**
 **/private/**
 ```
+
+### Additional Scan Folders
+
+This lets vault-wide sync include extra folders without changing the main scan directory.
+
+Enable: Go to **Settings -> Folders -> Additional Scan Folders** and add folder paths.
+
+Usage:
+
+- keeps one primary scan directory while adding extra areas
+- useful when Anki notes live in a few separate folders
+- applies to vault-wide sync rather than one-file manual sync
+
+### Excluded Folders
+
+This excludes whole folders from sync without writing raw glob patterns.
+
+Enable: Go to **Settings -> Folders -> Excluded Folders** and add folder paths.
+
+Usage:
+
+- skips selected folders even if they are inside the scan directory
+- useful for archives, templates, or notes that should never sync
+- easier than maintaining long ignore glob lists
 
 ## Note Type Table Features
 
@@ -529,7 +577,78 @@ Result:
 - the `Explanation` block goes to `Extra`
 - the `Ref` block goes to `Source`
 
+## Advanced Actions
+
+### Regenerate Note Type Table
+
+This refreshes the available Anki note types and field mappings from Anki.
+
+Enable: Go to **Settings -> Advanced -> Actions -> Regenerate Note Type Table** and click `Regenerate`.
+
+Usage:
+
+- use this after adding, renaming, or removing Anki note types
+- refreshes the note type table and field dictionary
+- helps repair stale field selections after Anki-side changes
+
+### Clear Media Cache
+
+This clears the plugin cache of media files already sent to Anki.
+
+Enable: Go to **Settings -> Advanced -> Actions -> Clear Media Cache** and click `Clear`.
+
+Usage:
+
+- useful when you replaced a media file but kept the same filename
+- forces the plugin to treat media as unsynced on the next relevant run
+
+### Clear File Hash Cache
+
+This clears the stored file hash database used by smart scan behavior.
+
+Enable: Go to **Settings -> Advanced -> Actions -> Clear File Hash Cache** and click `Clear`.
+
+Usage:
+
+- forces the plugin to rescan files as changed on the next sync
+- useful if cached change detection becomes stale
+
 ## Advanced and Experimental Features
+
+### Export Settings
+
+This exports the plugin configuration to a JSON file.
+
+Enable: Go to **Settings -> Advanced -> Import/Export Settings -> Export Settings**.
+
+Usage:
+
+- useful before major changes or when moving to another vault
+- keeps folder rules, parser settings, note types, and other plugin options together
+
+### Import Settings
+
+This imports a previously exported JSON settings file.
+
+Enable: Go to **Settings -> Advanced -> Import/Export Settings -> Import Settings**.
+
+Usage:
+
+- restore a backup of your plugin configuration
+- copy the same setup between vaults or machines
+- review imported settings carefully if the target vault structure differs
+
+### Show Status Bar
+
+This shows the plugin sync state in the Obsidian status bar.
+
+Enable: Go to **Settings -> General -> Show Status Bar**.
+
+Usage:
+
+- shows idle and active sync state more clearly
+- useful if you want visible feedback during larger sync runs
+- turn it off if you prefer a cleaner status bar
 
 ### AnkiConnect API Key
 
