@@ -38,9 +38,9 @@ const defaultDescs = {
 	"Structured Parser - Include From Heading Level": "Treat headings as section dividers before parsing cards. Exclude all headings removes all headings from card content.",
 	"Structured Parser - Front Field": "Which Anki field receives everything before the separator. Leave blank to use the first field.",
 	"Structured Parser - Back Field": "Which Anki field receives the main answer section after the separator. Leave blank to use the second field.",
-	"Structured Parser - File Link Field": "Optional field for a normal Obsidian file link. Leave blank to skip it.",
-	"Structured Parser - Context Field": "Optional field for context path text. Leave blank to skip it.",
-	"Structured Parser - Context Link Field": "Optional field for an exact card link using Advanced URI. Leave blank to skip it.",
+	"Structured Parser - File Link Field": "Optional field for a normal clickable Obsidian file link. Leave blank to skip it.",
+	"Structured Parser - Context Field": "Optional field for the heading/context path as plain text, not a clickable link. Leave blank to skip it.",
+	"Structured Parser - Context Link Field": "⚠️ To use this field, you must install the Advanced URI plugin.\nOptional field for a clickable direct link to the exact card location. Leave blank to skip it.",
 	"Structured Parser - Section Field Map": "Optional section routing, one per line. Example: Explanation=Extra."
 }
 
@@ -1436,7 +1436,7 @@ export class SettingsTab extends PluginSettingTab {
 					})
 				})
 			new Setting(container)
-				.setName("Context Path")
+				.setName("Context Path Field")
 				.setDesc(defaultDescs["Structured Parser - Context Field"])
 				.addDropdown(dropdown => {
 					dropdown.addOption("", "Blank")
