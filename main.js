@@ -336,9 +336,11 @@ const DEFAULT_IGNORED_FILE_GLOBS = [
 ];
 class SettingsTab extends obsidian.PluginSettingTab {
     tabContainer;
+    pendingActiveTabOverride = null;
     display() {
         const { containerEl } = this;
         containerEl.empty();
+        const plugin = this.plugin;
         // Header
         containerEl.createEl('h2', { text: 'Obsidian_to_Anki Settings' });
         const wikiLink = containerEl.createEl('a', {
@@ -348,20 +350,31 @@ class SettingsTab extends obsidian.PluginSettingTab {
         wikiLink.style.marginBottom = '16px';
         wikiLink.style.display = 'block';
         // Check if we have an active tab from before
-        const activeTab = this.tabContainer?.getActiveTab();
-        // Create tabs
-        this.tabContainer = new TabContainer(containerEl, [
+        const savedActiveTab = this.tabContainer?.getActiveTab();
+        const structuredParserEnabled = !!plugin.settings.Defaults["Structured Parser"];
+        const activeTab = this.pendingActiveTabOverride ?? savedActiveTab;
+        this.pendingActiveTabOverride = null;
+        const tabs = [
             { id: 'general', name: 'General' },
             { id: 'note-types', name: 'Note Types' },
             { id: 'folders', name: 'Folders' },
             { id: 'syntax', name: 'Syntax' },
             { id: 'advanced', name: 'Advanced' }
-        ], activeTab || undefined);
+        ];
+        if (structuredParserEnabled) {
+            tabs.push({ id: 'structured-parser', name: 'Structured Parser' });
+        }
+        const initialTabId = activeTab === 'structured-parser' && !structuredParserEnabled
+            ? 'advanced'
+            : activeTab || undefined;
+        // Create tabs
+        this.tabContainer = new TabContainer(containerEl, tabs, initialTabId);
         this.setupGeneralTab();
         this.setupNoteTypesTab();
         this.setupFoldersTab();
         this.setupSyntaxTab();
         this.setupAdvancedTab();
+        this.setupStructuredParserTab();
     }
     setupGeneralTab() {
         const container = this.tabContainer.getTabContent('general');
@@ -1367,170 +1380,186 @@ class SettingsTab extends obsidian.PluginSettingTab {
             .setDesc(defaultDescs["Structured Parser"])
             .addToggle(toggle => toggle
             .setValue(plugin.settings.Defaults["Structured Parser"])
-            .onChange((value) => {
+            .onChange(async (value) => {
             plugin.settings.Defaults["Structured Parser"] = value;
-            plugin.saveAllData();
+            await plugin.saveAllData();
+            this.pendingActiveTabOverride = value ? 'structured-parser' : 'advanced';
             this.display();
         }));
-        if (plugin.settings.Defaults["Structured Parser"]) {
-            const selectedNoteType = plugin.settings.Defaults["Structured Parser - Note Type"] || "";
-            const availableFields = selectedNoteType ? (plugin.fields_dict[selectedNoteType] || []) : [];
-            container.createEl('h4', { text: 'Main Fields', cls: 'anki-settings-section' });
-            new obsidian.Setting(container)
-                .setName("Note Type")
-                .setDesc(defaultDescs["Structured Parser - Note Type"])
-                .addDropdown(dropdown => {
-                dropdown.addOption("", "None");
-                for (let note_type of plugin.note_types) {
-                    dropdown.addOption(note_type, note_type);
-                }
-                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Note Type"] || "");
-                dropdown.onChange((value) => {
-                    plugin.settings.Defaults["Structured Parser - Note Type"] = value;
-                    if (value && plugin.fields_dict[value]) {
-                        const noteFields = plugin.fields_dict[value];
-                        if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Front Field"])) {
-                            plugin.settings.Defaults["Structured Parser - Front Field"] = noteFields[0] || "";
-                        }
-                        if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Back Field"])) {
-                            plugin.settings.Defaults["Structured Parser - Back Field"] = noteFields[1] || noteFields[0] || "";
-                        }
-                        if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - File Link Field"])) {
-                            plugin.settings.Defaults["Structured Parser - File Link Field"] = "";
-                        }
-                        if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Context Field"])) {
-                            plugin.settings.Defaults["Structured Parser - Context Field"] = "";
-                        }
-                        if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Context Link Field"])) {
-                            plugin.settings.Defaults["Structured Parser - Context Link Field"] = "";
-                        }
-                        plugin.settings.Defaults["Structured Parser - Section Field Map"] = this.normalizeSectionFieldMap(plugin.settings.Defaults["Structured Parser - Section Field Map"] || "", noteFields);
+    }
+    setupStructuredParserTab() {
+        const container = this.tabContainer.getTabContent('structured-parser');
+        if (!container)
+            return;
+        const plugin = this.plugin;
+        const selectedNoteType = plugin.settings.Defaults["Structured Parser - Note Type"] || "";
+        const availableFields = selectedNoteType ? (plugin.fields_dict[selectedNoteType] || []) : [];
+        container.createEl('h3', { text: 'Structured Parser' });
+        container.createEl('p', {
+            text: 'An alternative to custom regex that splits cards by configurable markers.',
+            cls: 'setting-item-description'
+        });
+        container.createEl('h4', { text: 'Main Fields', cls: 'anki-settings-section' });
+        new obsidian.Setting(container)
+            .setName("Note Type")
+            .setDesc(defaultDescs["Structured Parser - Note Type"])
+            .addDropdown(dropdown => {
+            dropdown.addOption("", "None");
+            for (let note_type of plugin.note_types) {
+                dropdown.addOption(note_type, note_type);
+            }
+            dropdown.setValue(plugin.settings.Defaults["Structured Parser - Note Type"] || "");
+            dropdown.onChange((value) => {
+                plugin.settings.Defaults["Structured Parser - Note Type"] = value;
+                if (value && plugin.fields_dict[value]) {
+                    const noteFields = plugin.fields_dict[value];
+                    if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Front Field"])) {
+                        plugin.settings.Defaults["Structured Parser - Front Field"] = noteFields[0] || "";
                     }
+                    if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Back Field"])) {
+                        plugin.settings.Defaults["Structured Parser - Back Field"] = noteFields[1] || noteFields[0] || "";
+                    }
+                    if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - File Link Field"])) {
+                        plugin.settings.Defaults["Structured Parser - File Link Field"] = "";
+                    }
+                    if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Context Field"])) {
+                        plugin.settings.Defaults["Structured Parser - Context Field"] = "";
+                    }
+                    if (!noteFields.includes(plugin.settings.Defaults["Structured Parser - Context Link Field"])) {
+                        plugin.settings.Defaults["Structured Parser - Context Link Field"] = "";
+                    }
+                    plugin.settings.Defaults["Structured Parser - Section Field Map"] = this.normalizeSectionFieldMap(plugin.settings.Defaults["Structured Parser - Section Field Map"] || "", noteFields);
+                }
+                plugin.saveAllData();
+                this.pendingActiveTabOverride = 'structured-parser';
+                this.display();
+            });
+        });
+        if (availableFields.length > 0) {
+            new obsidian.Setting(container)
+                .setName("Front Field")
+                .setDesc(defaultDescs["Structured Parser - Front Field"])
+                .addDropdown(dropdown => {
+                dropdown.addOption("", "Auto");
+                for (let field of availableFields) {
+                    dropdown.addOption(field, field);
+                }
+                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Front Field"] || "");
+                dropdown.onChange((value) => {
+                    plugin.settings.Defaults["Structured Parser - Front Field"] = value;
                     plugin.saveAllData();
+                    this.pendingActiveTabOverride = 'structured-parser';
                     this.display();
                 });
             });
-            if (availableFields.length > 0) {
-                new obsidian.Setting(container)
-                    .setName("Front Field")
-                    .setDesc(defaultDescs["Structured Parser - Front Field"])
-                    .addDropdown(dropdown => {
-                    dropdown.addOption("", "Auto");
-                    for (let field of availableFields) {
-                        dropdown.addOption(field, field);
-                    }
-                    dropdown.setValue(plugin.settings.Defaults["Structured Parser - Front Field"] || "");
-                    dropdown.onChange((value) => {
-                        plugin.settings.Defaults["Structured Parser - Front Field"] = value;
-                        plugin.saveAllData();
-                        this.display();
-                    });
-                });
-                new obsidian.Setting(container)
-                    .setName("Back Field")
-                    .setDesc(defaultDescs["Structured Parser - Back Field"])
-                    .addDropdown(dropdown => {
-                    dropdown.addOption("", "Auto");
-                    for (let field of availableFields) {
-                        dropdown.addOption(field, field);
-                    }
-                    dropdown.setValue(plugin.settings.Defaults["Structured Parser - Back Field"] || "");
-                    dropdown.onChange((value) => {
-                        plugin.settings.Defaults["Structured Parser - Back Field"] = value;
-                        plugin.saveAllData();
-                        this.display();
-                    });
-                });
-            }
-            container.createEl('h4', { text: 'Card Boundaries', cls: 'anki-settings-section' });
             new obsidian.Setting(container)
-                .setName("Front/Back Separator")
-                .setDesc(defaultDescs["Structured Parser - Front Back Separator"])
-                .addText(text => text
-                .setValue(plugin.settings.Defaults["Structured Parser - Front Back Separator"])
-                .setPlaceholder("? #flashcard")
-                .onChange((value) => {
-                plugin.settings.Defaults["Structured Parser - Front Back Separator"] = value;
-                plugin.saveAllData();
-            }));
-            new obsidian.Setting(container)
-                .setName("Card End Marker")
-                .setDesc(defaultDescs["Structured Parser - Card End Marker"])
-                .addText(text => text
-                .setValue(plugin.settings.Defaults["Structured Parser - Card End Marker"])
-                .setPlaceholder("---")
-                .onChange((value) => {
-                plugin.settings.Defaults["Structured Parser - Card End Marker"] = value;
-                plugin.saveAllData();
-            }));
-            new obsidian.Setting(container)
-                .setName("Include From Heading Level")
-                .setDesc(defaultDescs["Structured Parser - Include From Heading Level"])
+                .setName("Back Field")
+                .setDesc(defaultDescs["Structured Parser - Back Field"])
                 .addDropdown(dropdown => {
-                dropdown.addOption("-1", "Exclude all headings");
-                dropdown.addOption("0", "No heading filter");
-                dropdown.addOption("1", "H1");
-                dropdown.addOption("2", "H2");
-                dropdown.addOption("3", "H3");
-                dropdown.addOption("4", "H4");
-                dropdown.addOption("5", "H5");
-                dropdown.addOption("6", "H6");
-                dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0));
+                dropdown.addOption("", "Auto");
+                for (let field of availableFields) {
+                    dropdown.addOption(field, field);
+                }
+                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Back Field"] || "");
                 dropdown.onChange((value) => {
-                    plugin.settings.Defaults["Structured Parser - Include From Heading Level"] = parseInt(value);
+                    plugin.settings.Defaults["Structured Parser - Back Field"] = value;
                     plugin.saveAllData();
+                    this.pendingActiveTabOverride = 'structured-parser';
+                    this.display();
                 });
             });
-            if (availableFields.length > 0) {
-                container.createEl('h4', { text: 'Auto Fields', cls: 'anki-settings-section' });
-                new obsidian.Setting(container)
-                    .setName("File Link Field")
-                    .setDesc(defaultDescs["Structured Parser - File Link Field"])
-                    .addDropdown(dropdown => {
-                    dropdown.addOption("", "Blank");
-                    for (let field of availableFields) {
-                        dropdown.addOption(field, field);
-                    }
-                    dropdown.setValue(plugin.settings.Defaults["Structured Parser - File Link Field"] || "");
-                    dropdown.onChange((value) => {
-                        plugin.settings.Defaults["Structured Parser - File Link Field"] = value;
-                        plugin.saveAllData();
-                        this.display();
-                    });
+        }
+        container.createEl('h4', { text: 'Card Boundaries', cls: 'anki-settings-section' });
+        new obsidian.Setting(container)
+            .setName("Front/Back Separator")
+            .setDesc(defaultDescs["Structured Parser - Front Back Separator"])
+            .addText(text => text
+            .setValue(plugin.settings.Defaults["Structured Parser - Front Back Separator"])
+            .setPlaceholder("? #flashcard")
+            .onChange((value) => {
+            plugin.settings.Defaults["Structured Parser - Front Back Separator"] = value;
+            plugin.saveAllData();
+        }));
+        new obsidian.Setting(container)
+            .setName("Card End Marker")
+            .setDesc(defaultDescs["Structured Parser - Card End Marker"])
+            .addText(text => text
+            .setValue(plugin.settings.Defaults["Structured Parser - Card End Marker"])
+            .setPlaceholder("---")
+            .onChange((value) => {
+            plugin.settings.Defaults["Structured Parser - Card End Marker"] = value;
+            plugin.saveAllData();
+        }));
+        new obsidian.Setting(container)
+            .setName("Include From Heading Level")
+            .setDesc(defaultDescs["Structured Parser - Include From Heading Level"])
+            .addDropdown(dropdown => {
+            dropdown.addOption("-1", "Exclude all headings");
+            dropdown.addOption("0", "No heading filter");
+            dropdown.addOption("1", "H1");
+            dropdown.addOption("2", "H2");
+            dropdown.addOption("3", "H3");
+            dropdown.addOption("4", "H4");
+            dropdown.addOption("5", "H5");
+            dropdown.addOption("6", "H6");
+            dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0));
+            dropdown.onChange((value) => {
+                plugin.settings.Defaults["Structured Parser - Include From Heading Level"] = parseInt(value);
+                plugin.saveAllData();
+            });
+        });
+        if (availableFields.length > 0) {
+            container.createEl('h4', { text: 'Auto Fields', cls: 'anki-settings-section' });
+            new obsidian.Setting(container)
+                .setName("File Link Field")
+                .setDesc(defaultDescs["Structured Parser - File Link Field"])
+                .addDropdown(dropdown => {
+                dropdown.addOption("", "Blank");
+                for (let field of availableFields) {
+                    dropdown.addOption(field, field);
+                }
+                dropdown.setValue(plugin.settings.Defaults["Structured Parser - File Link Field"] || "");
+                dropdown.onChange((value) => {
+                    plugin.settings.Defaults["Structured Parser - File Link Field"] = value;
+                    plugin.saveAllData();
+                    this.pendingActiveTabOverride = 'structured-parser';
+                    this.display();
                 });
-                new obsidian.Setting(container)
-                    .setName("Context Path")
-                    .setDesc(defaultDescs["Structured Parser - Context Field"])
-                    .addDropdown(dropdown => {
-                    dropdown.addOption("", "Blank");
-                    for (let field of availableFields) {
-                        dropdown.addOption(field, field);
-                    }
-                    dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Field"] || "");
-                    dropdown.onChange((value) => {
-                        plugin.settings.Defaults["Structured Parser - Context Field"] = value;
-                        plugin.saveAllData();
-                        this.display();
-                    });
+            });
+            new obsidian.Setting(container)
+                .setName("Context Path")
+                .setDesc(defaultDescs["Structured Parser - Context Field"])
+                .addDropdown(dropdown => {
+                dropdown.addOption("", "Blank");
+                for (let field of availableFields) {
+                    dropdown.addOption(field, field);
+                }
+                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Field"] || "");
+                dropdown.onChange((value) => {
+                    plugin.settings.Defaults["Structured Parser - Context Field"] = value;
+                    plugin.saveAllData();
+                    this.pendingActiveTabOverride = 'structured-parser';
+                    this.display();
                 });
-                new obsidian.Setting(container)
-                    .setName("Exact Card Link Field")
-                    .setDesc(defaultDescs["Structured Parser - Context Link Field"])
-                    .addDropdown(dropdown => {
-                    dropdown.addOption("", "Blank");
-                    for (let field of availableFields) {
-                        dropdown.addOption(field, field);
-                    }
-                    dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Link Field"] || "");
-                    dropdown.onChange((value) => {
-                        plugin.settings.Defaults["Structured Parser - Context Link Field"] = value;
-                        plugin.saveAllData();
-                        this.display();
-                    });
+            });
+            new obsidian.Setting(container)
+                .setName("Exact Card Link Field")
+                .setDesc(defaultDescs["Structured Parser - Context Link Field"])
+                .addDropdown(dropdown => {
+                dropdown.addOption("", "Blank");
+                for (let field of availableFields) {
+                    dropdown.addOption(field, field);
+                }
+                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Link Field"] || "");
+                dropdown.onChange((value) => {
+                    plugin.settings.Defaults["Structured Parser - Context Link Field"] = value;
+                    plugin.saveAllData();
+                    this.pendingActiveTabOverride = 'structured-parser';
+                    this.display();
                 });
-                container.createEl('h4', { text: 'Extra Section Routing', cls: 'anki-settings-section' });
-                this.renderSectionFieldMapEditor(container, plugin, availableFields);
-            }
+            });
+            container.createEl('h4', { text: 'Extra Section Routing', cls: 'anki-settings-section' });
+            this.renderSectionFieldMapEditor(container, plugin, availableFields);
         }
     }
     setup_ignore_files(container, plugin) {
