@@ -1,6 +1,6 @@
 {
-    "name": "obsidian-to-anki-kai",
-    "version": "5.0.8",
+    "name": "obsidian-to-anki-tec",
+    "version": "6.0.0",
     "description": "This is an Anki integration plugin! Designed for efficient bulk exporting.",
     "main": "main.js",
     "scripts": {
@@ -13,8 +13,8 @@
         "test": "npm run test-wdio && npm run test-py"
     },
     "keywords": [],
-    "author": "",
-    "license": "MIT",
+    "author": "fR",
+    "license": "GPL-3.0-only",
     "devDependencies": {
         "@rollup/plugin-commonjs": "15.1.0",
         "@rollup/plugin-node-resolve": "9.0.0",

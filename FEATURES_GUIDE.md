@@ -314,10 +314,9 @@ Usage:
 
 - enables the dedicated parser settings tab
 - keeps your parser settings saved even if you later turn it off
-- the structured parser takes over only for the note type selected in `Parser -> Note Type`
-- for that selected note type, the old custom regex row in `Note Types` is skipped
-- for that selected note type, use the parser's own `Front Field`, `Back Field`, `File Link Field`, `Context Path`, and `Exact Card Link Field` settings instead of expecting the old regex-based note-type field settings to apply
 - to disable it, return to **Advanced** and turn off **Enable Structured Parser**
+
+Warning: `⚠️` The structured parser takes over only for the note type selected in `Parser -> Note Type`. For that selected note type, the old custom regex row in `Note Types` is skipped, so regex-based field behavior for that note type will not run. Use the parser's own `Front Field`, `Back Field`, `File Link Field`, `Context Path`, and `Exact Card Link Field` settings instead.
 
 ### Note Type
 
@@ -329,7 +328,6 @@ Usage:
 
 - choose the Anki note type you want to create
 - that chosen note type becomes the one controlled by the structured parser
-- if the same note type also has a custom regex in `Note Types`, the structured parser wins and that regex row is not used for that note type
 - after you choose a note type, the parser field dropdowns are populated from that note type
 - if you leave field selections blank, the parser can fall back to the first and second fields automatically
 
@@ -463,7 +461,7 @@ Usage:
 
 This adds the text context path from the structured parser.
 
-Enable: Open **Settings -> Parser -> Context Path** and choose a destination field.
+Enable: Open **Settings -> Parser -> Context Path Field** and choose a destination field.
 
 Usage:
 

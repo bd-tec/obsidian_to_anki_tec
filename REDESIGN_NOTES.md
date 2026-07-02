@@ -2,7 +2,7 @@
 
 This document explains the design direction of `Obsidian_to_Anki_tec`: why the settings UI changed, how the sync workflow was improved, and what major UX decisions shaped the fork.
 
-For detailed feature behavior and setup instructions, see [FEATURES_NOTES.md](./FEATURES_NOTES.md).
+For detailed feature behavior and setup instructions, see [FEATURES_GUIDE.md](./FEATURES_GUIDE.md).
 
 ## Design Goals
 
@@ -15,7 +15,7 @@ Main goals:
 
 ## Settings Redesign
 
-The major settings redesign is based on [PR #673](https://github.com/ObsidianToAnki/Obsidian_to_Anki/pull/673).
+The major settings redesign is based on [PR #673](https://github.com/ObsidianToAnki/Obsidian_to_Anki/pull/673) by [n4tt0u](https://github.com/n4tt0u/Obsidian_to_Anki_Kai).
 
 Key changes:
 
@@ -41,7 +41,7 @@ Design intent:
 - support “sync what I am working on right now”
 - make sync actions easier to reach from the current context
 
-For the actual commands and user-facing behavior, see [FEATURES_NOTES.md](./FEATURES_NOTES.md#sync-and-workflow-features).
+For the actual commands and user-facing behavior, see [FEATURES_GUIDE.md](./FEATURES_GUIDE.md#sync-commands).
 
 ## Feedback and Status Improvements
 
@@ -68,7 +68,7 @@ The Structured Parser tab is intentionally conditional:
 
 - `Enable Structured Parser` stays in `Advanced`
 - the dedicated parser tab only appears when the feature is enabled
-- detailed parser behavior and setup live in [FEATURES_NOTES.md](./FEATURES_NOTES.md#structured-parser)
+- detailed parser behavior and setup live in [FEATURES_GUIDE.md](./FEATURES_GUIDE.md#structured-parser)
 
 ## Scope of This Document
 
@@ -78,11 +78,12 @@ This file focuses on:
 - what major settings and sync design changes were introduced
 - how the fork tries to improve usability
 
-This file does not try to be the full user manual. For feature behavior, examples, parser setup, ID handling, tags, links, and advanced options, use [FEATURES_NOTES.md](./FEATURES_NOTES.md).
+This file does not try to be the full user manual. For feature behavior, examples, parser setup, ID handling, tags, links, and advanced options, use [FEATURES_GUIDE.md](./FEATURES_GUIDE.md).
 
 ## References
 
-- [FEATURES_NOTES.md](./FEATURES_NOTES.md)
+- [FEATURES_GUIDE.md](./FEATURES_GUIDE.md)
+- [REDESIGN_NOTES](https://github.com/n4tt0u/Obsidian_to_Anki_Kai/blob/master/REDESIGN_NOTES.md)
 - [Upstream Obsidian_to_Anki wiki](https://github.com/Pseudonium/Obsidian_to_Anki/wiki)
 - [Latest releases for this fork](https://github.com/bd-tec/obsidian_to_anki_tec/releases/latest)
 - [Settings redesign PR #673](https://github.com/ObsidianToAnki/Obsidian_to_Anki/pull/673)
