@@ -1,10 +1,10 @@
 {
   "id": "obsidian-to-anki-plugin",
-  "name": "Obsidian_to_Anki_Kai",
+  "name": "Obsidian_to_Anki_tec",
   "version": "5.0.8",
   "minAppVersion": "0.9.20",
   "description": "Forked version featuring a redesigned UI, extended tag support (YAML/Scan Tags), and improved sync workflow.",
   "author": "n4tt0u (Original: Pseudonium)",
-  "authorUrl": "https://github.com/n4tt0u/Obsidian_to_Anki_Kai",
+  "authorUrl": "https://github.com/bd-tec/obsidian_to_anki_tec",
   "isDesktopOnly": true
 }
