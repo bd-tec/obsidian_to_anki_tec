@@ -28,6 +28,7 @@ const defaultDescs = {
 	"Render Clozes - Highlight": "Apply highlight style to the rendered text.",
 	"Show Status Bar": "Show the Anki sync status indicator in the status bar.",
 	"AnkiConnect API Key": "The API key configured in AnkiConnect settings (leave blank if none).",
+	"Auto Relink by Content": "When a card's ID no longer exists in Anki, search for a strict content match and re-link instead of creating a duplicate.",
 	"Structured Parser": "Use the structured parser instead of custom regex for the configured note type. Splits cards by configurable markers instead of a regex.",
 	"Structured Parser - Note Type": "The Anki note type to use with the structured parser.",
 	"Structured Parser - Front Back Separator": "The text that separates the question/front from the answer/back. Example: ? #flashcard.",
@@ -243,6 +244,9 @@ export class SettingsTab extends PluginSettingTab {
 		if (!(plugin.settings["Defaults"].hasOwnProperty("AnkiConnect API Key"))) {
 			plugin.settings["Defaults"]["AnkiConnect API Key"] = ""
 		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Auto Relink by Content"))) {
+			plugin.settings["Defaults"]["Auto Relink by Content"] = true
+		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser"))) {
 			plugin.settings["Defaults"]["Structured Parser"] = false
 		}
@@ -298,6 +302,7 @@ export class SettingsTab extends PluginSettingTab {
 				key === "Cloze Deletion Context Menu" ||
 				key === "Show Status Bar" ||
 				key === "AnkiConnect API Key" ||
+				key === "Auto Relink by Content" ||
 				key === "Structured Parser" ||
 				key === "Structured Parser - Note Type" ||
 				key === "Structured Parser - Front Back Separator" ||
@@ -1163,6 +1168,22 @@ export class SettingsTab extends PluginSettingTab {
 					plugin.settings.Defaults["Cloze Deletion Context Menu"] = value
 					plugin.saveAllData()
 					new Notice("Please reload Obsidian to apply changes.")
+				})
+			)
+
+		container.createEl('h3', { text: 'Orphan Recovery', cls: 'anki-settings-section' })
+		container.createEl('p', {
+			text: "When a card's Anki ID no longer exists in Anki, these settings control how the plugin recovers.",
+			cls: 'setting-item-description'
+		})
+		new Setting(container)
+			.setName("Auto Re-link by Content")
+			.setDesc(defaultDescs["Auto Relink by Content"])
+			.addToggle(toggle => toggle
+				.setValue(plugin.settings.Defaults["Auto Relink by Content"])
+				.onChange((value) => {
+					plugin.settings.Defaults["Auto Relink by Content"] = value
+					plugin.saveAllData()
 				})
 			)
 

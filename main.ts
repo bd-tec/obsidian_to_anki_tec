@@ -66,6 +66,7 @@ export default class MyPlugin extends Plugin {
 				"Cloze Deletion Context Menu": false,
 				"Show Status Bar": true,
 				"AnkiConnect API Key": "",
+				"Auto Relink by Content": true,
 				"Structured Parser": false,
 				"Structured Parser - Note Type": "",
 				"Structured Parser - Front Back Separator": "? #flashcard",

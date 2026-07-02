@@ -1,8 +1,9 @@
 /*Class for managing a list of files, and their Anki requests.*/
 import { ParsedSettings, FileData } from './interfaces/settings-interface'
 import { App, TFile, TFolder, TAbstractFile, CachedMetadata, FileSystemAdapter, Notice } from 'obsidian'
-import { AllFile } from './file'
+import { AllFile, RelinkCandidate } from './file'
 import * as AnkiConnect from './anki'
+import { AnkiConnectNote } from './interfaces/note-interface'
 import { basename } from 'path'
 import multimatch from "multimatch"
 interface addNoteResponse {
@@ -50,6 +51,88 @@ function difference<T>(setA: Set<T>, setB: Set<T>): Set<T> {
     return _difference
 }
 
+function normalizeFieldText(text: string): string {
+    if (text == null) return ''
+    let value = text.replace(/<[^>]*>/g, '')
+    value = value
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+    return value.replace(/\s+/g, ' ').trim()
+}
+
+function escapeForAnkiSearch(text: string): string {
+    return normalizeFieldText(text).slice(0, 200).replace(/"/g, '""')
+}
+
+function getSearchTokens(text: string): string[] {
+    const normalized = normalizeFieldText(text).toLowerCase()
+    const tokens = normalized.match(/[a-z0-9\u00c0-\u024f]+/gi) ?? []
+    return tokens.filter(token => token.length >= 3).slice(0, 6)
+}
+
+interface MatchingCandidate {
+    noteId: number
+    fields: Record<string, string>
+}
+
+async function findMatchingCandidates(firstFieldValue: string, firstFieldName: string): Promise<MatchingCandidate[]> {
+    if (!firstFieldValue) return []
+    const escapedValue = escapeForAnkiSearch(firstFieldValue)
+    const tokens = getSearchTokens(firstFieldValue)
+    const wildcardQuery = tokens.map(token => `*${token}*`).join(" ")
+    const fieldWildcardQuery = firstFieldName
+        ? tokens.map(token => `${firstFieldName}:*${token}*`).join(" ")
+        : ""
+    const queries = firstFieldName
+        ? [
+            `${firstFieldName}:"${escapedValue}"`,
+            `"${escapedValue}"`,
+            fieldWildcardQuery,
+            wildcardQuery
+        ].filter(query => query.length > 0)
+        : [
+            `"${escapedValue}"`,
+            wildcardQuery
+        ].filter(query => query.length > 0)
+
+    let noteIds: number[] = []
+    try {
+        for (let query of queries) {
+            const result = await AnkiConnect.invoke('findNotes', { query }) as number[]
+            if (result && result.length > 0) {
+                noteIds = result
+                break
+            }
+        }
+    } catch (error) {
+        console.warn('findMatchingCandidates: findNotes failed:', error)
+        return []
+    }
+    if (!noteIds.length) return []
+
+    let infos: any[]
+    try {
+        infos = await AnkiConnect.invoke('notesInfo', { notes: noteIds }) as any[]
+    } catch (error) {
+        console.warn('findMatchingCandidates: notesInfo failed:', error)
+        return []
+    }
+
+    const candidates: MatchingCandidate[] = []
+    for (let info of infos) {
+        if (!info || !info.fields) continue
+        const fields: Record<string, string> = {}
+        for (let fieldName of Object.keys(info.fields)) {
+            fields[fieldName] = info.fields[fieldName].value ?? ''
+        }
+        candidates.push({ noteId: info.noteId, fields })
+    }
+    return candidates
+}
+
 
 export class FileManager {
     app: App
@@ -59,6 +142,10 @@ export class FileManager {
     file_hashes: Record<string, string>
     requests_1_result: any
     added_media_set: Set<string>
+    relinked: number = 0
+    relinkFailed: number = 0
+    ambiguousDuplicates: number = 0
+    duplicateTagged: number = 0
 
     constructor(app: App, data: ParsedSettings, files: TFile[], file_hashes: Record<string, string>, added_media: string[]) {
         this.app = app
@@ -170,6 +257,11 @@ export class FileManager {
     }
 
     async requests_1() {
+        if (this.data.auto_relink) {
+            await this.relinkOrphans()
+            await this.adoptMissingIds()
+        }
+
         let requests: AnkiConnect.AnkiConnectRequest[] = []
         let temp: AnkiConnect.AnkiConnectRequest[] = []
         console.info("Requesting addition of new deck into Anki...")
@@ -296,6 +388,182 @@ export class FileManager {
             }
         }
         await this.requests_2()
+    }
+
+    async relinkOrphans() {
+        for (let file of this.ownFiles) {
+            const orphans = file.notes_to_relink.slice()
+            for (let orphan of orphans) {
+                const matchedId = await this.findExactMatchingNoteId(file, orphan.note)
+                if (matchedId !== null) {
+                    this.removeFromAddList(file, orphan)
+                    file.notes_to_edit.push({ note: orphan.note, identifier: matchedId })
+                    if (orphan.kind !== "structured") {
+                        file.notesToWriteInline.push({
+                            position: orphan.writePosition,
+                            id: matchedId,
+                            inline: orphan.inline
+                        })
+                    } else {
+                        file.structuredMetadataWrites.push({
+                            position: orphan.writePosition,
+                            id: matchedId
+                        })
+                    }
+                    file.notes_to_relink.splice(file.notes_to_relink.indexOf(orphan), 1)
+                    this.relinked++
+                } else {
+                    this.relinkFailed++
+                }
+            }
+            this.refreshAllNotesToAdd(file)
+        }
+        if (this.relinked > 0) {
+            new Notice(`Re-linked ${this.relinked} orphaned note${this.relinked === 1 ? '' : 's'} to existing Anki cards.`)
+        }
+    }
+
+    async adoptMissingIds() {
+        for (let file of this.ownFiles) {
+            const orphanNotes = new Set(file.notes_to_relink.map(orphan => orphan.note))
+            const candidates = this.collectAdditionCandidates(file)
+            for (let candidate of candidates) {
+                if (orphanNotes.has(candidate.note)) continue
+                const matchedId = await this.findExactMatchingNoteId(file, candidate.note)
+                if (matchedId === null) continue
+                this.removeFromAddList(file, candidate)
+                file.notes_to_edit.push({ note: candidate.note, identifier: matchedId })
+                if (candidate.kind !== "structured") {
+                    file.notesToWriteInline.push({
+                        position: candidate.writePosition,
+                        id: matchedId,
+                        inline: candidate.inline
+                    })
+                } else {
+                    file.structuredMetadataWrites.push({
+                        position: candidate.writePosition,
+                        id: matchedId
+                    })
+                }
+                this.relinked++
+            }
+            this.refreshAllNotesToAdd(file)
+        }
+    }
+
+    async findExactMatchingNoteIds(file: AllFile, note: AnkiConnectNote): Promise<number[]> {
+        const fieldNames = file.data.fields_dict[note.modelName]
+        if (!fieldNames || fieldNames.length === 0) return []
+
+        const ignoredFields = new Set<string>()
+        if (file.data.structured_note_type === note.modelName && file.data.structured_context_link_field) {
+            ignoredFields.add(file.data.structured_context_link_field)
+        }
+        if (file.data.structured_note_type === note.modelName && file.data.structured_file_link_field) {
+            ignoredFields.add(file.data.structured_file_link_field)
+        }
+        if (file.data.structured_note_type === note.modelName && file.data.structured_context_field) {
+            ignoredFields.add(file.data.structured_context_field)
+        }
+
+        const compareFieldNames = fieldNames.filter(fieldName => !ignoredFields.has(fieldName))
+        const obsValuesByField = new Map<string, string>()
+        for (let fieldName of compareFieldNames) {
+            obsValuesByField.set(fieldName, normalizeFieldText(note.fields[fieldName] ?? ''))
+        }
+        const frontField = compareFieldNames[0]
+        const backField = compareFieldNames[1]
+        const frontText = obsValuesByField.get(frontField) ?? ''
+        if (!frontText) return []
+
+        const candidates = await findMatchingCandidates(frontText, frontField)
+        const exactMatches: number[] = []
+        for (let candidate of candidates) {
+            let allMatch = true
+            for (let fieldName of compareFieldNames) {
+                const obsValue = obsValuesByField.get(fieldName) ?? ''
+                const mustMatch = fieldName === frontField || fieldName === backField || obsValue.length > 0
+                if (!mustMatch) continue
+                const candidateValue = normalizeFieldText(candidate.fields[fieldName] ?? '')
+                if (candidateValue !== obsValue) {
+                    allMatch = false
+                    break
+                }
+            }
+            if (allMatch) {
+                exactMatches.push(candidate.noteId)
+            }
+        }
+        return exactMatches
+    }
+
+    async findExactMatchingNoteId(file: AllFile, note: AnkiConnectNote): Promise<number | null> {
+        const exactMatches = await this.findExactMatchingNoteIds(file, note)
+        if (exactMatches.length === 1) {
+            return exactMatches[0]
+        }
+        if (exactMatches.length > 1) {
+            this.ambiguousDuplicates++
+            await this.tagDuplicateCandidates(file, note, exactMatches)
+        }
+        return null
+    }
+
+    async tagDuplicateCandidates(file: AllFile, note: AnkiConnectNote, exactMatches?: number[]): Promise<number> {
+        const matches = exactMatches ?? await this.findExactMatchingNoteIds(file, note)
+        if (matches.length === 0) return 0
+        const tag = matches.length > 1 ? "obsidian_relink_ambiguous" : "obsidian_duplicate_candidate"
+        try {
+            await AnkiConnect.invoke('addTags', { notes: matches, tags: tag })
+            this.duplicateTagged += matches.length
+            console.warn(`Tagged ${matches.length} Anki note(s) with "${tag}" for duplicate review in ${file.path}`)
+            return matches.length
+        } catch (error) {
+            console.warn(`Failed to tag duplicate candidates in ${file.path}: ${error}`)
+            return 0
+        }
+    }
+
+    collectAdditionCandidates(file: AllFile): RelinkCandidate[] {
+        const result: RelinkCandidate[] = []
+        file.notes_to_add.forEach((note, index) => {
+            result.push({ note, kind: "block", index, writePosition: file.id_indexes[index], inline: false })
+        })
+        file.inline_notes_to_add.forEach((note, index) => {
+            result.push({ note, kind: "inline", index, writePosition: file.inline_id_indexes[index], inline: true })
+        })
+        file.regex_notes_to_add.forEach((note, index) => {
+            result.push({ note, kind: "regex", index, writePosition: file.regex_id_indexes[index], inline: false })
+        })
+        file.structured_notes_to_add.forEach((note, index) => {
+            result.push({ note, kind: "structured", index, writePosition: file.structured_id_indexes[index], inline: false })
+        })
+        return result
+    }
+
+    removeFromAddList(file: AllFile, candidate: RelinkCandidate) {
+        const removeAt = (notes: AnkiConnectNote[], indexes: number[]) => {
+            const idx = notes.indexOf(candidate.note)
+            const targetIndex = idx >= 0 ? idx : candidate.index
+            notes.splice(targetIndex, 1)
+            indexes.splice(targetIndex, 1)
+        }
+        if (candidate.kind === "block") {
+            removeAt(file.notes_to_add, file.id_indexes)
+        } else if (candidate.kind === "inline") {
+            removeAt(file.inline_notes_to_add, file.inline_id_indexes)
+        } else if (candidate.kind === "regex") {
+            removeAt(file.regex_notes_to_add, file.regex_id_indexes)
+        } else if (candidate.kind === "structured") {
+            removeAt(file.structured_notes_to_add, file.structured_id_indexes)
+        }
+    }
+
+    refreshAllNotesToAdd(file: AllFile) {
+        file.all_notes_to_add = file.notes_to_add
+            .concat(file.inline_notes_to_add)
+            .concat(file.regex_notes_to_add)
+            .concat(file.structured_notes_to_add)
     }
 
     getHashes(): Record<string, string> {
