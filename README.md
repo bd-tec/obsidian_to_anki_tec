@@ -1,6 +1,6 @@
 # Obsidian_to_Anki_tec
 
-`Obsidian_to_Anki_tec` is a custom fork built on top of [Obsidian_to_Anki](https://github.com/Pseudonium/Obsidian_to_Anki) and the active fork [Obsidian_to_Anki_Kai](https://github.com/n4tt0u/Obsidian_to_Anki_Kai), focused on a cleaner settings UI, better sync workflow, and quality-of-life features for everyday Anki use from Obsidian.
+`Obsidian_to_Anki_tec` is an Obsidian plugin for sending flashcards from Markdown notes to Anki. It is a custom fork built on top of [Obsidian_to_Anki](https://github.com/Pseudonium/Obsidian_to_Anki) and [Obsidian_to_Anki_Kai](https://github.com/n4tt0u/Obsidian_to_Anki_Kai), focused on a cleaner settings UI, better sync workflow, and quality-of-life features for everyday Anki use from Obsidian.
 
 ## Installation
 
@@ -49,23 +49,30 @@ First-time use:
 3. Enable or reload the Obsidian plugin so it can generate settings.
 4. Sync from Obsidian.
 
-After setup, Anki does not need to be running just to open Obsidian, but it must be running whenever you sync.
+After setup, Anki does not need to be running just to open Obsidian, but it **must be running whenever you sync**.
 
 ## What This Fork Adds
 
 - Redesigned settings UI with tabs, searchable tables, and folder pickers
 - Better sync commands and UX for current file, folder, and full vault sync
 - Per-note-type control for file links, context, and aliases
-- Structured Parser support for readable Markdown flashcards
+- Structured Parser support for readable Markdown flashcards, including heading-based front/back cards
 - Extended tag support, scan tag filtering, and improved field stability
 - Advanced options such as Regex Required Tags, frontmatter note IDs, and reading-view cloze rendering
 
 ## Detailed Documentation
 
-- [Feature and functionality notes](./FEATURES_NOTES.md)
+- [Features guide](./FEATURES_GUIDE.md)
 - [Redesign notes](./REDESIGN_NOTES.md)
 - [Latest releases](https://github.com/bd-tec/obsidian_to_anki_tec/releases/latest)
 - [Original upstream wiki](https://github.com/Pseudonium/Obsidian_to_Anki/wiki)
+
+## Credit
+
+- Original plugin: **Pseudonium** ([Obsidian_to_Anki](https://github.com/Pseudonium/Obsidian_to_Anki))
+- Kai redesign: **n4tt0u** ([Obsidian_to_Anki_Kai](https://github.com/n4tt0u/Obsidian_to_Anki_Kai))
+
+All upstream contributors deserve the credit for the actual product. This fork is a small set of bug fixes layered on top of their work.
 
 ## Support
 

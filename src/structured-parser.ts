@@ -23,6 +23,8 @@ interface TextBlock {
 	startOffset: number
 }
 
+type StructuredCardSource = "separator" | "heading"
+
 function findTrailingMetadataStart(back: string): number {
 	const metadataRegex = /(?:\n[ \t]*(?:\^anki-\d+|(?:<!--)?ID: \d+(?:-->)?)[ \t]*)+\s*$/
 	const match = back.match(metadataRegex)
@@ -174,15 +176,7 @@ function splitOnHigherLevelHeadings(blocks: TextBlock[], includeFromHeadingLevel
 	return out
 }
 
-export function parseStructuredCards(
-	text: string,
-	separator: string,
-	cardEndMarker: string,
-	includeFromHeadingLevel: number = 0,
-	sectionFieldMap: Record<string, string> = {}
-): StructuredCard[] {
-	if (!separator) return []
-	const sepRegex = separatorToRegex(separator)
+function blockTextByEndMarker(text: string, cardEndMarker: string): TextBlock[] {
 	const endMarkerEscaped = cardEndMarker ? escapeRegex(cardEndMarker) : null
 	const endLineRegex = endMarkerEscaped ? new RegExp(`^[ \\t]*${endMarkerEscaped}[ \\t]*$`, 'm') : null
 	const blocks: TextBlock[] = []
@@ -201,6 +195,96 @@ export function parseStructuredCards(
 	} else {
 		blocks.push({ text, startOffset: 0 })
 	}
+	return blocks
+}
+
+function structuredCardFromParts(
+	front: string,
+	back: string,
+	blockStartOffset: number,
+	cardStartInBlock: number,
+	backStartInBlock: number,
+	sectionFieldMap: Record<string, string>
+): StructuredCard {
+	const routed = findRoutedSections(back, sectionFieldMap)
+	const fallback = splitAnswerAndExtra(back)
+	const answer = Object.keys(sectionFieldMap).length > 0 ? routed.answer : fallback.answer
+	const extra = Object.keys(sectionFieldMap).length > 0 ? "" : fallback.extra
+
+	const idRegex = new RegExp(ID_REGEXP_STR, 'g')
+	const anchorRegex = /\^anki-\d+/g
+	let idMatch: RegExpExecArray | null
+	let identifier: number | null = null
+	const idSpans: [number, number][] = []
+	while ((idMatch = idRegex.exec(back)) !== null) {
+		identifier = parseInt(idMatch[1])
+		const absStart = blockStartOffset + backStartInBlock + idMatch.index
+		idSpans.push([absStart, absStart + idMatch[0].length])
+	}
+	const hasAnchor = anchorRegex.test(back)
+
+	return {
+		front,
+		answer,
+		extra,
+		routedSections: routed.sections,
+		identifier,
+		startOffset: blockStartOffset + cardStartInBlock,
+		idWriteOffset: blockStartOffset + backStartInBlock + findTrailingMetadataStart(back),
+		idSpans,
+		hasAnchor
+	}
+}
+
+function parseHeadingStructuredCards(
+	text: string,
+	cardEndMarker: string,
+	headingLevel: number,
+	sectionFieldMap: Record<string, string>
+): StructuredCard[] {
+	const normalizedHeadingLevel = Math.min(Math.max(headingLevel || 2, 1), 6)
+	const headingMarks = "#".repeat(normalizedHeadingLevel)
+	const headingRegex = new RegExp(`(^|\\n)( {0,3})${escapeRegex(headingMarks)}\\s+(.+?)[ \\t]*(?:\\r?\\n|$)`)
+	const cards: StructuredCard[] = []
+
+	for (let block of blockTextByEndMarker(text, cardEndMarker)) {
+		const match = block.text.match(headingRegex)
+		if (!match || match.index === undefined) continue
+
+		const linePrefixLength = match[1].length
+		const cardStartInBlock = match.index + linePrefixLength
+		const front = match[3]
+		const backStartInBlock = match.index + match[0].length
+		const back = block.text.slice(backStartInBlock)
+		if (!front.trim() || !back.trim()) continue
+
+		cards.push(structuredCardFromParts(
+			front,
+			back,
+			block.startOffset,
+			cardStartInBlock,
+			backStartInBlock,
+			sectionFieldMap
+		))
+	}
+	return cards
+}
+
+export function parseStructuredCards(
+	text: string,
+	separator: string,
+	cardEndMarker: string,
+	includeFromHeadingLevel: number = 0,
+	sectionFieldMap: Record<string, string> = {},
+	cardSource: string = "separator",
+	headingLevel: number = 2
+): StructuredCard[] {
+	if ((cardSource as StructuredCardSource) === "heading") {
+		return parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionFieldMap)
+	}
+	if (!separator) return []
+	const sepRegex = separatorToRegex(separator)
+	const blocks = blockTextByEndMarker(text, cardEndMarker)
 
 	const cards: StructuredCard[] = []
 	for (let block of splitOnHigherLevelHeadings(blocks, includeFromHeadingLevel)) {
@@ -211,35 +295,14 @@ export function parseStructuredCards(
 		const sepIndex = sepMatch.index
 		const front = blockText.slice(0, sepIndex)
 		const back = blockText.slice(sepIndex + sepMatch[0].length)
-		const routed = findRoutedSections(back, sectionFieldMap)
-		const fallback = splitAnswerAndExtra(back)
-		const answer = Object.keys(sectionFieldMap).length > 0 ? routed.answer : fallback.answer
-		const extra = Object.keys(sectionFieldMap).length > 0 ? "" : fallback.extra
-
-		const idRegex = new RegExp(ID_REGEXP_STR, 'g')
-		const anchorRegex = /\^anki-\d+/g
-		let idMatch: RegExpExecArray | null
-		let identifier: number | null = null
-		const idSpans: [number, number][] = []
-		while ((idMatch = idRegex.exec(back)) !== null) {
-			identifier = parseInt(idMatch[1])
-			const absStart = block.startOffset + sepIndex + sepMatch[0].length + idMatch.index
-			idSpans.push([absStart, absStart + idMatch[0].length])
-		}
-		const hasAnchor = anchorRegex.test(back)
-
-		const idWriteOffset = block.startOffset + sepIndex + sepMatch[0].length + findTrailingMetadataStart(back)
-		cards.push({
+		cards.push(structuredCardFromParts(
 			front,
-			answer,
-			extra,
-			routedSections: routed.sections,
-			identifier,
-			startOffset: block.startOffset,
-			idWriteOffset,
-			idSpans,
-			hasAnchor
-		})
+			back,
+			block.startOffset,
+			0,
+			sepIndex + sepMatch[0].length,
+			sectionFieldMap
+		))
 	}
 	return cards
 }

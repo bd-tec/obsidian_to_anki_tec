@@ -321,8 +321,10 @@ const defaultDescs = {
     "Auto Relink by Content": "When a card's ID no longer exists in Anki, search for a strict content match and re-link instead of creating a duplicate.",
     "Structured Parser": "Use the structured parser instead of custom regex for the configured note type. Splits cards by configurable markers instead of a regex.",
     "Structured Parser - Note Type": "The Anki note type to use with the structured parser.",
+    "Structured Parser - Card Source": "Choose whether cards start from a front/back separator or from Markdown headings.",
     "Structured Parser - Front Back Separator": "The text that separates the question/front from the answer/back. Example: ? #flashcard.",
     "Structured Parser - Card End Marker": "The text on its own line that marks the end of a card. Example: ---.",
+    "Structured Parser - Heading Level": "When Card Source is Heading, this heading level becomes the card front. Example: H2 parses ## Heading as Front.",
     "Structured Parser - Include From Heading Level": "Treat headings as section dividers before parsing cards. Exclude all headings removes all headings from card content.",
     "Structured Parser - Front Field": "Which Anki field receives everything before the separator. Leave blank to use the first field.",
     "Structured Parser - Back Field": "Which Anki field receives the main answer section after the separator. Leave blank to use the second field.",
@@ -552,11 +554,17 @@ class SettingsTab extends obsidian.PluginSettingTab {
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Note Type"))) {
             plugin.settings["Defaults"]["Structured Parser - Note Type"] = "";
         }
+        if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Card Source"))) {
+            plugin.settings["Defaults"]["Structured Parser - Card Source"] = "separator";
+        }
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Front Back Separator"))) {
             plugin.settings["Defaults"]["Structured Parser - Front Back Separator"] = "? #flashcard";
         }
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Card End Marker"))) {
             plugin.settings["Defaults"]["Structured Parser - Card End Marker"] = "---";
+        }
+        if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Heading Level"))) {
+            plugin.settings["Defaults"]["Structured Parser - Heading Level"] = 2;
         }
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Include From Heading Level"))) {
             plugin.settings["Defaults"]["Structured Parser - Include From Heading Level"] = 0;
@@ -603,8 +611,10 @@ class SettingsTab extends obsidian.PluginSettingTab {
                 key === "Auto Relink by Content" ||
                 key === "Structured Parser" ||
                 key === "Structured Parser - Note Type" ||
+                key === "Structured Parser - Card Source" ||
                 key === "Structured Parser - Front Back Separator" ||
                 key === "Structured Parser - Card End Marker" ||
+                key === "Structured Parser - Heading Level" ||
                 key === "Structured Parser - Include From Heading Level" ||
                 key === "Structured Parser - Front Field" ||
                 key === "Structured Parser - Back Field" ||
@@ -1408,6 +1418,7 @@ class SettingsTab extends obsidian.PluginSettingTab {
             return;
         const plugin = this.plugin;
         const selectedNoteType = plugin.settings.Defaults["Structured Parser - Note Type"] || "";
+        const selectedCardSource = plugin.settings.Defaults["Structured Parser - Card Source"] || "separator";
         const availableFields = selectedNoteType ? (plugin.fields_dict[selectedNoteType] || []) : [];
         this.createSectionHeader(container, 'Structured Parser', {
             description: 'An alternative to custom regex that splits cards by configurable markers.',
@@ -1485,15 +1496,49 @@ class SettingsTab extends obsidian.PluginSettingTab {
         }
         this.createSectionHeader(container, 'Card Boundaries', { level: 'h4' });
         new obsidian.Setting(container)
-            .setName("Front/Back Separator")
-            .setDesc(defaultDescs["Structured Parser - Front Back Separator"])
-            .addText(text => text
-            .setValue(plugin.settings.Defaults["Structured Parser - Front Back Separator"])
-            .setPlaceholder("? #flashcard")
-            .onChange((value) => {
-            plugin.settings.Defaults["Structured Parser - Front Back Separator"] = value;
-            plugin.saveAllData();
-        }));
+            .setName("Card Source")
+            .setDesc(defaultDescs["Structured Parser - Card Source"])
+            .addDropdown(dropdown => {
+            dropdown.addOption("separator", "Separator");
+            dropdown.addOption("heading", "Heading");
+            dropdown.setValue(selectedCardSource);
+            dropdown.onChange((value) => {
+                plugin.settings.Defaults["Structured Parser - Card Source"] = value;
+                plugin.saveAllData();
+                this.pendingActiveTabOverride = 'structured-parser';
+                this.display();
+            });
+        });
+        if (selectedCardSource === "heading") {
+            new obsidian.Setting(container)
+                .setName("Heading Level")
+                .setDesc(defaultDescs["Structured Parser - Heading Level"])
+                .addDropdown(dropdown => {
+                dropdown.addOption("1", "H1");
+                dropdown.addOption("2", "H2");
+                dropdown.addOption("3", "H3");
+                dropdown.addOption("4", "H4");
+                dropdown.addOption("5", "H5");
+                dropdown.addOption("6", "H6");
+                dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Heading Level"] ?? 2));
+                dropdown.onChange((value) => {
+                    plugin.settings.Defaults["Structured Parser - Heading Level"] = parseInt(value);
+                    plugin.saveAllData();
+                });
+            });
+        }
+        else {
+            new obsidian.Setting(container)
+                .setName("Front/Back Separator")
+                .setDesc(defaultDescs["Structured Parser - Front Back Separator"])
+                .addText(text => text
+                .setValue(plugin.settings.Defaults["Structured Parser - Front Back Separator"])
+                .setPlaceholder("? #flashcard")
+                .onChange((value) => {
+                plugin.settings.Defaults["Structured Parser - Front Back Separator"] = value;
+                plugin.saveAllData();
+            }));
+        }
         new obsidian.Setting(container)
             .setName("Card End Marker")
             .setDesc(defaultDescs["Structured Parser - Card End Marker"])
@@ -1504,24 +1549,26 @@ class SettingsTab extends obsidian.PluginSettingTab {
             plugin.settings.Defaults["Structured Parser - Card End Marker"] = value;
             plugin.saveAllData();
         }));
-        new obsidian.Setting(container)
-            .setName("Include From Heading Level")
-            .setDesc(defaultDescs["Structured Parser - Include From Heading Level"])
-            .addDropdown(dropdown => {
-            dropdown.addOption("-1", "Exclude all headings");
-            dropdown.addOption("0", "No heading filter");
-            dropdown.addOption("1", "H1");
-            dropdown.addOption("2", "H2");
-            dropdown.addOption("3", "H3");
-            dropdown.addOption("4", "H4");
-            dropdown.addOption("5", "H5");
-            dropdown.addOption("6", "H6");
-            dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0));
-            dropdown.onChange((value) => {
-                plugin.settings.Defaults["Structured Parser - Include From Heading Level"] = parseInt(value);
-                plugin.saveAllData();
+        if (selectedCardSource !== "heading") {
+            new obsidian.Setting(container)
+                .setName("Include From Heading Level")
+                .setDesc(defaultDescs["Structured Parser - Include From Heading Level"])
+                .addDropdown(dropdown => {
+                dropdown.addOption("-1", "Exclude all headings");
+                dropdown.addOption("0", "No heading filter");
+                dropdown.addOption("1", "H1");
+                dropdown.addOption("2", "H2");
+                dropdown.addOption("3", "H3");
+                dropdown.addOption("4", "H4");
+                dropdown.addOption("5", "H5");
+                dropdown.addOption("6", "H6");
+                dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0));
+                dropdown.onChange((value) => {
+                    plugin.settings.Defaults["Structured Parser - Include From Heading Level"] = parseInt(value);
+                    plugin.saveAllData();
+                });
             });
-        });
+        }
         if (availableFields.length > 0) {
             this.createSectionHeader(container, 'Auto Fields', { level: 'h4' });
             new obsidian.Setting(container)
@@ -2283,8 +2330,10 @@ async function settingToData(app, settings, fields_dict) {
     result.auto_relink = settings.Defaults["Auto Relink by Content"] ?? true;
     result.structured_parser = settings.Defaults["Structured Parser"] ?? false;
     result.structured_note_type = settings.Defaults["Structured Parser - Note Type"] ?? "";
+    result.structured_card_source = settings.Defaults["Structured Parser - Card Source"] ?? "separator";
     result.structured_separator = settings.Defaults["Structured Parser - Front Back Separator"] ?? "? #flashcard";
     result.structured_card_end = settings.Defaults["Structured Parser - Card End Marker"] ?? "---";
+    result.structured_heading_level = settings.Defaults["Structured Parser - Heading Level"] ?? 2;
     result.structured_include_heading_level = settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0;
     result.structured_front_field = settings.Defaults["Structured Parser - Front Field"] ?? "";
     result.structured_back_field = settings.Defaults["Structured Parser - Back Field"] ?? "";
@@ -67222,10 +67271,7 @@ function splitOnHigherLevelHeadings(blocks, includeFromHeadingLevel) {
     }
     return out;
 }
-function parseStructuredCards(text, separator, cardEndMarker, includeFromHeadingLevel = 0, sectionFieldMap = {}) {
-    if (!separator)
-        return [];
-    const sepRegex = separatorToRegex(separator);
+function blockTextByEndMarker(text, cardEndMarker) {
     const endMarkerEscaped = cardEndMarker ? escapeRegex(cardEndMarker) : null;
     const endLineRegex = endMarkerEscaped ? new RegExp(`^[ \\t]*${endMarkerEscaped}[ \\t]*$`, 'm') : null;
     const blocks = [];
@@ -67246,6 +67292,64 @@ function parseStructuredCards(text, separator, cardEndMarker, includeFromHeading
     else {
         blocks.push({ text, startOffset: 0 });
     }
+    return blocks;
+}
+function structuredCardFromParts(front, back, blockStartOffset, cardStartInBlock, backStartInBlock, sectionFieldMap) {
+    const routed = findRoutedSections(back, sectionFieldMap);
+    const fallback = splitAnswerAndExtra(back);
+    const answer = Object.keys(sectionFieldMap).length > 0 ? routed.answer : fallback.answer;
+    const extra = Object.keys(sectionFieldMap).length > 0 ? "" : fallback.extra;
+    const idRegex = new RegExp(ID_REGEXP_STR, 'g');
+    const anchorRegex = /\^anki-\d+/g;
+    let idMatch;
+    let identifier = null;
+    const idSpans = [];
+    while ((idMatch = idRegex.exec(back)) !== null) {
+        identifier = parseInt(idMatch[1]);
+        const absStart = blockStartOffset + backStartInBlock + idMatch.index;
+        idSpans.push([absStart, absStart + idMatch[0].length]);
+    }
+    const hasAnchor = anchorRegex.test(back);
+    return {
+        front,
+        answer,
+        extra,
+        routedSections: routed.sections,
+        identifier,
+        startOffset: blockStartOffset + cardStartInBlock,
+        idWriteOffset: blockStartOffset + backStartInBlock + findTrailingMetadataStart(back),
+        idSpans,
+        hasAnchor
+    };
+}
+function parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionFieldMap) {
+    const normalizedHeadingLevel = Math.min(Math.max(headingLevel || 2, 1), 6);
+    const headingMarks = "#".repeat(normalizedHeadingLevel);
+    const headingRegex = new RegExp(`(^|\\n)( {0,3})${escapeRegex(headingMarks)}\\s+(.+?)[ \\t]*(?:\\r?\\n|$)`);
+    const cards = [];
+    for (let block of blockTextByEndMarker(text, cardEndMarker)) {
+        const match = block.text.match(headingRegex);
+        if (!match || match.index === undefined)
+            continue;
+        const linePrefixLength = match[1].length;
+        const cardStartInBlock = match.index + linePrefixLength;
+        const front = match[3];
+        const backStartInBlock = match.index + match[0].length;
+        const back = block.text.slice(backStartInBlock);
+        if (!front.trim() || !back.trim())
+            continue;
+        cards.push(structuredCardFromParts(front, back, block.startOffset, cardStartInBlock, backStartInBlock, sectionFieldMap));
+    }
+    return cards;
+}
+function parseStructuredCards(text, separator, cardEndMarker, includeFromHeadingLevel = 0, sectionFieldMap = {}, cardSource = "separator", headingLevel = 2) {
+    if (cardSource === "heading") {
+        return parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionFieldMap);
+    }
+    if (!separator)
+        return [];
+    const sepRegex = separatorToRegex(separator);
+    const blocks = blockTextByEndMarker(text, cardEndMarker);
     const cards = [];
     for (let block of splitOnHigherLevelHeadings(blocks, includeFromHeadingLevel)) {
         const blockText = block.text;
@@ -67255,33 +67359,7 @@ function parseStructuredCards(text, separator, cardEndMarker, includeFromHeading
         const sepIndex = sepMatch.index;
         const front = blockText.slice(0, sepIndex);
         const back = blockText.slice(sepIndex + sepMatch[0].length);
-        const routed = findRoutedSections(back, sectionFieldMap);
-        const fallback = splitAnswerAndExtra(back);
-        const answer = Object.keys(sectionFieldMap).length > 0 ? routed.answer : fallback.answer;
-        const extra = Object.keys(sectionFieldMap).length > 0 ? "" : fallback.extra;
-        const idRegex = new RegExp(ID_REGEXP_STR, 'g');
-        const anchorRegex = /\^anki-\d+/g;
-        let idMatch;
-        let identifier = null;
-        const idSpans = [];
-        while ((idMatch = idRegex.exec(back)) !== null) {
-            identifier = parseInt(idMatch[1]);
-            const absStart = block.startOffset + sepIndex + sepMatch[0].length + idMatch.index;
-            idSpans.push([absStart, absStart + idMatch[0].length]);
-        }
-        const hasAnchor = anchorRegex.test(back);
-        const idWriteOffset = block.startOffset + sepIndex + sepMatch[0].length + findTrailingMetadataStart(back);
-        cards.push({
-            front,
-            answer,
-            extra,
-            routedSections: routed.sections,
-            identifier,
-            startOffset: block.startOffset,
-            idWriteOffset,
-            idSpans,
-            hasAnchor
-        });
+        cards.push(structuredCardFromParts(front, back, block.startOffset, 0, sepIndex + sepMatch[0].length, sectionFieldMap));
     }
     return cards;
 }
@@ -67868,7 +67946,7 @@ class AllFile extends AbstractFile {
             return;
         if (!(this.data.fields_dict.hasOwnProperty(noteType)))
             return;
-        const cards = parseStructuredCards(this.file, this.data.structured_separator, this.data.structured_card_end, this.data.structured_include_heading_level, this.data.structured_section_field_map);
+        const cards = parseStructuredCards(this.file, this.data.structured_separator, this.data.structured_card_end, this.data.structured_include_heading_level, this.data.structured_section_field_map, this.data.structured_card_source, this.data.structured_heading_level);
         const filename = path$1.basename(this.path, path$1.extname(this.path));
         for (let card of cards) {
             this.ignore_spans.push([card.startOffset, card.idWriteOffset]);
@@ -71133,8 +71211,10 @@ class MyPlugin extends obsidian.Plugin {
                 "Auto Relink by Content": true,
                 "Structured Parser": false,
                 "Structured Parser - Note Type": "",
+                "Structured Parser - Card Source": "separator",
                 "Structured Parser - Front Back Separator": "? #flashcard",
                 "Structured Parser - Card End Marker": "---",
+                "Structured Parser - Heading Level": 2,
                 "Structured Parser - Include From Heading Level": 0,
                 "Structured Parser - Front Field": "",
                 "Structured Parser - Back Field": "",

@@ -651,7 +651,9 @@ export class AllFile extends AbstractFile {
             this.data.structured_separator,
             this.data.structured_card_end,
             this.data.structured_include_heading_level,
-            this.data.structured_section_field_map
+            this.data.structured_section_field_map,
+            this.data.structured_card_source,
+            this.data.structured_heading_level
         )
         const filename = basename(this.path, extname(this.path))
         for (let card of cards) {

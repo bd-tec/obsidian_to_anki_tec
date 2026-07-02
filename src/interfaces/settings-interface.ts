@@ -50,8 +50,10 @@ export interface PluginSettings {
 		"Auto Relink by Content": boolean,
 		"Structured Parser": boolean,
 		"Structured Parser - Note Type": string,
+		"Structured Parser - Card Source": string,
 		"Structured Parser - Front Back Separator": string,
 		"Structured Parser - Card End Marker": string,
+		"Structured Parser - Heading Level": number,
 		"Structured Parser - Include From Heading Level": number,
 		"Structured Parser - Front Field": string,
 		"Structured Parser - Back Field": string,
@@ -98,8 +100,10 @@ export interface FileData {
 	auto_relink: boolean
 	structured_parser: boolean
 	structured_note_type: string
+	structured_card_source: string
 	structured_separator: string
 	structured_card_end: string
+	structured_heading_level: number
 	structured_include_heading_level: number
 	structured_front_field: string
 	structured_back_field: string

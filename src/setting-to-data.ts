@@ -120,8 +120,10 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     result.auto_relink = settings.Defaults["Auto Relink by Content"] ?? true;
     result.structured_parser = settings.Defaults["Structured Parser"] ?? false;
     result.structured_note_type = settings.Defaults["Structured Parser - Note Type"] ?? "";
+    result.structured_card_source = settings.Defaults["Structured Parser - Card Source"] ?? "separator";
     result.structured_separator = settings.Defaults["Structured Parser - Front Back Separator"] ?? "? #flashcard";
     result.structured_card_end = settings.Defaults["Structured Parser - Card End Marker"] ?? "---";
+    result.structured_heading_level = settings.Defaults["Structured Parser - Heading Level"] ?? 2;
     result.structured_include_heading_level = settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0;
     result.structured_front_field = settings.Defaults["Structured Parser - Front Field"] ?? "";
     result.structured_back_field = settings.Defaults["Structured Parser - Back Field"] ?? "";

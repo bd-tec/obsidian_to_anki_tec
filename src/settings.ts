@@ -31,8 +31,10 @@ const defaultDescs = {
 	"Auto Relink by Content": "When a card's ID no longer exists in Anki, search for a strict content match and re-link instead of creating a duplicate.",
 	"Structured Parser": "Use the structured parser instead of custom regex for the configured note type. Splits cards by configurable markers instead of a regex.",
 	"Structured Parser - Note Type": "The Anki note type to use with the structured parser.",
+	"Structured Parser - Card Source": "Choose whether cards start from a front/back separator or from Markdown headings.",
 	"Structured Parser - Front Back Separator": "The text that separates the question/front from the answer/back. Example: ? #flashcard.",
 	"Structured Parser - Card End Marker": "The text on its own line that marks the end of a card. Example: ---.",
+	"Structured Parser - Heading Level": "When Card Source is Heading, this heading level becomes the card front. Example: H2 parses ## Heading as Front.",
 	"Structured Parser - Include From Heading Level": "Treat headings as section dividers before parsing cards. Exclude all headings removes all headings from card content.",
 	"Structured Parser - Front Field": "Which Anki field receives everything before the separator. Leave blank to use the first field.",
 	"Structured Parser - Back Field": "Which Anki field receives the main answer section after the separator. Leave blank to use the second field.",
@@ -301,11 +303,17 @@ export class SettingsTab extends PluginSettingTab {
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Note Type"))) {
 			plugin.settings["Defaults"]["Structured Parser - Note Type"] = ""
 		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Card Source"))) {
+			plugin.settings["Defaults"]["Structured Parser - Card Source"] = "separator"
+		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Front Back Separator"))) {
 			plugin.settings["Defaults"]["Structured Parser - Front Back Separator"] = "? #flashcard"
 		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Card End Marker"))) {
 			plugin.settings["Defaults"]["Structured Parser - Card End Marker"] = "---"
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Heading Level"))) {
+			plugin.settings["Defaults"]["Structured Parser - Heading Level"] = 2
 		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Include From Heading Level"))) {
 			plugin.settings["Defaults"]["Structured Parser - Include From Heading Level"] = 0
@@ -353,8 +361,10 @@ export class SettingsTab extends PluginSettingTab {
 				key === "Auto Relink by Content" ||
 				key === "Structured Parser" ||
 				key === "Structured Parser - Note Type" ||
+				key === "Structured Parser - Card Source" ||
 				key === "Structured Parser - Front Back Separator" ||
 				key === "Structured Parser - Card End Marker" ||
+				key === "Structured Parser - Heading Level" ||
 				key === "Structured Parser - Include From Heading Level" ||
 				key === "Structured Parser - Front Field" ||
 				key === "Structured Parser - Back Field" ||
@@ -1250,6 +1260,7 @@ export class SettingsTab extends PluginSettingTab {
 
 		const plugin = (this as any).plugin
 		const selectedNoteType = plugin.settings.Defaults["Structured Parser - Note Type"] || ""
+		const selectedCardSource = plugin.settings.Defaults["Structured Parser - Card Source"] || "separator"
 		const availableFields = selectedNoteType ? (plugin.fields_dict[selectedNoteType] || []) : []
 
 		this.createSectionHeader(container, 'Structured Parser', {
@@ -1331,16 +1342,49 @@ export class SettingsTab extends PluginSettingTab {
 
 		this.createSectionHeader(container, 'Card Boundaries', { level: 'h4' })
 		new Setting(container)
-			.setName("Front/Back Separator")
-			.setDesc(defaultDescs["Structured Parser - Front Back Separator"])
-			.addText(text => text
-				.setValue(plugin.settings.Defaults["Structured Parser - Front Back Separator"])
-				.setPlaceholder("? #flashcard")
-				.onChange((value) => {
-					plugin.settings.Defaults["Structured Parser - Front Back Separator"] = value
+			.setName("Card Source")
+			.setDesc(defaultDescs["Structured Parser - Card Source"])
+			.addDropdown(dropdown => {
+				dropdown.addOption("separator", "Separator")
+				dropdown.addOption("heading", "Heading")
+				dropdown.setValue(selectedCardSource)
+				dropdown.onChange((value) => {
+					plugin.settings.Defaults["Structured Parser - Card Source"] = value
 					plugin.saveAllData()
+					this.pendingActiveTabOverride = 'structured-parser'
+					this.display()
 				})
-			)
+			})
+		if (selectedCardSource === "heading") {
+			new Setting(container)
+				.setName("Heading Level")
+				.setDesc(defaultDescs["Structured Parser - Heading Level"])
+				.addDropdown(dropdown => {
+					dropdown.addOption("1", "H1")
+					dropdown.addOption("2", "H2")
+					dropdown.addOption("3", "H3")
+					dropdown.addOption("4", "H4")
+					dropdown.addOption("5", "H5")
+					dropdown.addOption("6", "H6")
+					dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Heading Level"] ?? 2))
+					dropdown.onChange((value) => {
+						plugin.settings.Defaults["Structured Parser - Heading Level"] = parseInt(value)
+						plugin.saveAllData()
+					})
+				})
+		} else {
+			new Setting(container)
+				.setName("Front/Back Separator")
+				.setDesc(defaultDescs["Structured Parser - Front Back Separator"])
+				.addText(text => text
+					.setValue(plugin.settings.Defaults["Structured Parser - Front Back Separator"])
+					.setPlaceholder("? #flashcard")
+					.onChange((value) => {
+						plugin.settings.Defaults["Structured Parser - Front Back Separator"] = value
+						plugin.saveAllData()
+					})
+				)
+		}
 		new Setting(container)
 			.setName("Card End Marker")
 			.setDesc(defaultDescs["Structured Parser - Card End Marker"])
@@ -1352,24 +1396,26 @@ export class SettingsTab extends PluginSettingTab {
 					plugin.saveAllData()
 				})
 			)
-		new Setting(container)
-			.setName("Include From Heading Level")
-			.setDesc(defaultDescs["Structured Parser - Include From Heading Level"])
-			.addDropdown(dropdown => {
-				dropdown.addOption("-1", "Exclude all headings")
-				dropdown.addOption("0", "No heading filter")
-				dropdown.addOption("1", "H1")
-				dropdown.addOption("2", "H2")
-				dropdown.addOption("3", "H3")
-				dropdown.addOption("4", "H4")
-				dropdown.addOption("5", "H5")
-				dropdown.addOption("6", "H6")
-				dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0))
-				dropdown.onChange((value) => {
-					plugin.settings.Defaults["Structured Parser - Include From Heading Level"] = parseInt(value)
-					plugin.saveAllData()
+		if (selectedCardSource !== "heading") {
+			new Setting(container)
+				.setName("Include From Heading Level")
+				.setDesc(defaultDescs["Structured Parser - Include From Heading Level"])
+				.addDropdown(dropdown => {
+					dropdown.addOption("-1", "Exclude all headings")
+					dropdown.addOption("0", "No heading filter")
+					dropdown.addOption("1", "H1")
+					dropdown.addOption("2", "H2")
+					dropdown.addOption("3", "H3")
+					dropdown.addOption("4", "H4")
+					dropdown.addOption("5", "H5")
+					dropdown.addOption("6", "H6")
+					dropdown.setValue(String(plugin.settings.Defaults["Structured Parser - Include From Heading Level"] ?? 0))
+					dropdown.onChange((value) => {
+						plugin.settings.Defaults["Structured Parser - Include From Heading Level"] = parseInt(value)
+						plugin.saveAllData()
+					})
 				})
-			})
+		}
 
 		if (availableFields.length > 0) {
 			this.createSectionHeader(container, 'Auto Fields', { level: 'h4' })
