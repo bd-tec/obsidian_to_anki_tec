@@ -31,6 +31,17 @@ function anchor_to_str(identifier: number): string {
     return "^anki-" + identifier.toString() + "\n"
 }
 
+export type RelinkKind = "block" | "inline" | "regex" | "structured"
+
+export interface RelinkCandidate {
+    note: AnkiConnectNote
+    identifier?: number | null
+    kind: RelinkKind
+    writePosition: number
+    inline: boolean
+    index: number
+}
+
 function apply_edits(text: string, edits: Array<{ start: number, end: number, text: string }>): string {
     /*Apply edits to text in reverse order to maintain indices.*/
     let sorted_edits = edits.sort((a, b) => b.start - a.start)
@@ -91,6 +102,7 @@ abstract class AbstractFile {
     id_indexes: number[]
     notes_to_edit: AnkiConnectNoteAndID[]
     notes_to_delete: number[]
+    notes_to_relink: RelinkCandidate[]
     all_notes_to_add: AnkiConnectNote[]
 
     note_ids: Array<number | null>
@@ -348,7 +360,8 @@ export class AllFile extends AbstractFile {
     useFrontmatterID: boolean = false
     frontmatterID: number | null = null
     existingIDSpans: [number, number][] = []
-    notesToWriteInline: { position: number, id: number }[] = [] // For fallback: had valid ID (YAML) but needs inline
+    notesToWriteInline: { position: number, id: number, inline?: boolean }[] = [] // For fallback: had valid ID (YAML) but needs inline
+    structuredMetadataWrites: { position: number, id: number }[] = []
 
     constructor(file_contents: string, path: string, url: string, data: FileData, file_cache: CachedMetadata) {
         super(file_contents, path, url, data, file_cache)
@@ -412,6 +425,8 @@ export class AllFile extends AbstractFile {
         this.structured_writebacks = []
         this.notes_to_edit = []
         this.notes_to_delete = []
+        this.notes_to_relink = []
+        this.structuredMetadataWrites = []
     }
 
     scanNotes() {
@@ -466,7 +481,17 @@ export class AllFile extends AbstractFile {
                     else if (parsed.identifier == NOTE_TYPE_ERROR) {
                         console.warn("Did not recognise note type ", parsed.note.modelName, " in file ", this.path)
                     } else {
-                        console.warn("Note with id", parsed.identifier, " in file ", this.path, " does not exist in Anki!")
+                        this.notes_to_relink.push({
+                            note: parsed.note,
+                            identifier: parsed.identifier,
+                            kind: "block",
+                            writePosition: position,
+                            inline: false,
+                            index: this.notes_to_add.length
+                        })
+                        parsed.note.tags.push(...this.global_tags.split(TAG_SEP))
+                        this.notes_to_add.push(parsed.note)
+                        this.id_indexes.push(position)
                     }
                 } else {
                     this.notes_to_edit.push(parsed)
@@ -519,7 +544,17 @@ export class AllFile extends AbstractFile {
                     if (parsed.identifier == CLOZE_ERROR) {
                         continue
                     }
-                    console.warn("Note with id", parsed.identifier, " in file ", this.path, " does not exist in Anki!")
+                    this.notes_to_relink.push({
+                        note: parsed.note,
+                        identifier: parsed.identifier,
+                        kind: "inline",
+                        writePosition: position,
+                        inline: true,
+                        index: this.inline_notes_to_add.length
+                    })
+                    parsed.note.tags.push(...this.global_tags.split(TAG_SEP))
+                    this.inline_notes_to_add.push(parsed.note)
+                    this.inline_id_indexes.push(position)
                 } else {
                     this.notes_to_edit.push(parsed)
                 }
@@ -559,7 +594,17 @@ export class AllFile extends AbstractFile {
                                 this.ignore_spans.pop()
                                 continue
                             }
-                            console.warn("Note with id", parsed.identifier, " in file ", this.path, " does not exist in Anki!")
+                            parsed.note.tags.push(...this.global_tags.split(TAG_SEP))
+                            this.notes_to_relink.push({
+                                note: parsed.note,
+                                identifier: parsed.identifier,
+                                kind: "regex",
+                                writePosition: match.index + match[0].length,
+                                inline: false,
+                                index: this.regex_notes_to_add.length
+                            })
+                            this.regex_notes_to_add.push(parsed.note)
+                            this.regex_id_indexes.push(match.index + match[0].length)
                         } else {
                             this.notes_to_edit.push(parsed)
                         }
@@ -638,7 +683,14 @@ export class AllFile extends AbstractFile {
                 this.structured_notes_to_add.push(parsed.note)
                 this.structured_id_indexes.push(card.idWriteOffset)
             } else if (!this.data.EXISTING_IDS.includes(parsed.identifier)) {
-                console.warn("Note with id", parsed.identifier, " in file ", this.path, " does not exist in Anki!")
+                this.notes_to_relink.push({
+                    note: parsed.note,
+                    identifier: parsed.identifier,
+                    kind: "structured",
+                    writePosition: card.idWriteOffset,
+                    inline: false,
+                    index: this.structured_notes_to_add.length
+                })
                 this.structured_notes_to_add.push(parsed.note)
                 this.structured_id_indexes.push(card.idWriteOffset)
             } else {
@@ -806,6 +858,31 @@ export class AllFile extends AbstractFile {
         this.file = this.file.replace(double_regexp, "$1")
     }
 
+    cleanupStructuredMetadata(canonicalIds: Set<number>) {
+        const keepAnchors = !!this.data.structured_context_link_field
+        const idTokenRegex = /(?:<!--)?ID: (\d+)(?:-->)?/g
+        const anchorTokenRegex = /\^anki-(\d+)/g
+        const metadataBlockRegex = /(?:^[ \t]*(?:\^anki-\d+|(?:<!--)?ID: \d+(?:-->)?)[ \t]*\n?)+/gm
+        this.file = this.file.replace(metadataBlockRegex, (fullBlock) => {
+            const idMatches = Array.from(fullBlock.matchAll(idTokenRegex))
+            const anchorMatches = Array.from(fullBlock.matchAll(anchorTokenRegex))
+            const allIds = [...anchorMatches, ...idMatches]
+                .map(match => parseInt(match[1]))
+                .filter(id => canonicalIds.has(id))
+            if (allIds.length === 0) {
+                return ""
+            }
+            const id = allIds[allIds.length - 1]
+            const lines: string[] = []
+            if (keepAnchors && anchorMatches.length > 0) {
+                lines.push(`^anki-${id}`)
+            }
+            lines.push(this.data.comment ? `<!--ID: ${id}-->` : `ID: ${id}`)
+            return lines.join("\n") + "\n"
+        })
+        this.file = this.file.replace(/\n{3,}/g, "\n\n")
+    }
+
     writeIDs() {
         let edits: { start: number, end: number, text: string }[] = []
 
@@ -872,7 +949,7 @@ export class AllFile extends AbstractFile {
 
             // Fallback Inline Writes (Restoring YAML ID to Inline)
             this.notesToWriteInline.forEach(item => {
-                edits.push({ start: item.position, end: item.position, text: id_to_str(item.id, false, this.data.comment) });
+                edits.push({ start: item.position, end: item.position, text: id_to_str(item.id, item.inline ?? false, this.data.comment) });
             });
 
             // Standard Inline Writes
@@ -919,6 +996,12 @@ export class AllFile extends AbstractFile {
                 if (entry.hasAnchor) continue
                 edits.push({ start: entry.writePosition, end: entry.writePosition, text: `\n${anchor_to_str(identifier).trim()}` })
             }
+            for (let entry of this.structuredMetadataWrites) {
+                const metadata = this.data.structured_context_link_field
+                    ? `\n${anchor_to_str(entry.id).trim()}\n${id_to_str(entry.id, false, this.data.comment).trim()}`
+                    : `\n${id_to_str(entry.id, false, this.data.comment).trim()}`
+                edits.push({ start: entry.position, end: entry.position, text: metadata })
+            }
         }
 
         this.file = apply_edits(this.file, edits)
@@ -929,6 +1012,27 @@ export class AllFile extends AbstractFile {
         if (!this.useFrontmatterID) {
             this.fix_newline_ids()
         }
+
+        const canonicalIds = new Set<number>()
+        for (let parsed of this.notes_to_edit) {
+            if (parsed.identifier) {
+                canonicalIds.add(parsed.identifier)
+            }
+        }
+        for (let id of this.note_ids) {
+            if (id) {
+                canonicalIds.add(id)
+            }
+        }
+        if (this.useFrontmatterID) {
+            const targetID = this.notes_to_edit.length > 0
+                ? this.notes_to_edit[0].identifier
+                : (this.note_ids.length > 0 ? this.note_ids[0] : null)
+            if (targetID) {
+                canonicalIds.add(targetID)
+            }
+        }
+        this.cleanupStructuredMetadata(canonicalIds)
     }
 
     getStructuredIdentifierForNote(note: AnkiConnectNote): number | null {

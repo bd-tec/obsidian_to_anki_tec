@@ -47,6 +47,7 @@ export interface PluginSettings {
 		"Cloze Deletion Context Menu": boolean,
 		"Show Status Bar": boolean,
 		"AnkiConnect API Key": string,
+		"Auto Relink by Content": boolean,
 		"Structured Parser": boolean,
 		"Structured Parser - Note Type": string,
 		"Structured Parser - Front Back Separator": string,
@@ -94,6 +95,7 @@ export interface FileData {
 	add_file_link: boolean
 	link_label: string
 	saveIDToFrontmatter: boolean
+	auto_relink: boolean
 	structured_parser: boolean
 	structured_note_type: string
 	structured_separator: string

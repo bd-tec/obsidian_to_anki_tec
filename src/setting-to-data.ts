@@ -99,6 +99,7 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
         .map(folderPathToIgnoreGlob)
     result.ignored_file_globs = [...(settings.IGNORED_FILE_GLOBS ?? []), ...excludedFolders];
     result.saveIDToFrontmatter = settings.Defaults["Save Note ID to Frontmatter"];
+    result.auto_relink = settings.Defaults["Auto Relink by Content"] ?? true;
     result.structured_parser = settings.Defaults["Structured Parser"] ?? false;
     result.structured_note_type = settings.Defaults["Structured Parser - Note Type"] ?? "";
     result.structured_separator = settings.Defaults["Structured Parser - Front Back Separator"] ?? "? #flashcard";
