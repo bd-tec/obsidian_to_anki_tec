@@ -1,8 +1,9 @@
 import { PluginSettings, ParsedSettings } from './interfaces/settings-interface'
-import { App } from 'obsidian'
+import { App, Notice } from 'obsidian'
 import * as AnkiConnect from './anki'
 import { ID_REGEXP_STR } from './note'
 import { escapeRegex } from './constants'
+import { basename } from 'path'
 
 function folderPathToIgnoreGlob(path: string): string {
     return `${path.replace(/\/+$/, '')}/**`
@@ -54,7 +55,10 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     let result: ParsedSettings = <ParsedSettings>{}
 
     //Some processing required
-    result.vault_name = app.vault.getName()
+    const adapter = app.vault.adapter as { getBasePath?: () => string }
+    result.vault_name = (adapter && typeof adapter.getBasePath === 'function')
+        ? basename(adapter.getBasePath())
+        : app.vault.getName()
     result.fields_dict = fields_dict
     result.custom_regexps = {}
     for (let note_type of Object.keys(settings.CUSTOM_REGEXPS)) {
@@ -76,7 +80,12 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
         },
         tags: settings.Defaults["Default Tags"].split(",").map((tag) => tag.trim()).filter((tag) => tag.length > 0)
     }
-    result.EXISTING_IDS = await AnkiConnect.invoke('findNotes', { query: "" }) as number[]
+    try {
+        result.EXISTING_IDS = await AnkiConnect.invoke('findNotes', { query: "" }) as number[]
+    } catch (error) {
+        new Notice("Cannot reach AnkiConnect (port 8765). Is Anki running with the AnkiConnect add-on enabled? Sync aborted.")
+        throw error
+    }
 
     //RegExp section
     result.FROZEN_REGEXP = new RegExp(escapeRegex(settings.Syntax["Frozen Fields Line"]) + String.raw` - (.*?):\n((?:[^\n][\n]?)+)`, "g")
