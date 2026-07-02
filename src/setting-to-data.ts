@@ -8,6 +8,12 @@ function folderPathToIgnoreGlob(path: string): string {
     return `${path.replace(/\/+$/, '')}/**`
 }
 
+function sanitizeRegexSource(source: string): string {
+    if (!source) return source
+    // Rewrite PCRE-style end-of-string escapes so they behave in JS regexes.
+    return source.replace(/(?<!\\)\\([Zz])/g, '$')
+}
+
 function parseSectionFieldMap(raw: string): Record<string, string> {
     const result: Record<string, string> = {}
     if (!raw) return result
@@ -50,7 +56,10 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     //Some processing required
     result.vault_name = app.vault.getName()
     result.fields_dict = fields_dict
-    result.custom_regexps = settings.CUSTOM_REGEXPS
+    result.custom_regexps = {}
+    for (let note_type of Object.keys(settings.CUSTOM_REGEXPS)) {
+        result.custom_regexps[note_type] = sanitizeRegexSource(settings.CUSTOM_REGEXPS[note_type])
+    }
     result.regexp_tags = settings.REGEXP_TAGS
     result.file_link_fields = settings.FILE_LINK_FIELDS
     result.context_fields = settings.CONTEXT_FIELDS
