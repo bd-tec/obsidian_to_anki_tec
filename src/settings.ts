@@ -77,7 +77,7 @@ export class SettingsTab extends PluginSettingTab {
 			{ id: 'advanced', name: 'Advanced' }
 		]
 		if (structuredParserEnabled) {
-			tabs.push({ id: 'structured-parser', name: 'Structured Parser' })
+			tabs.push({ id: 'structured-parser', name: 'Parser' })
 		}
 		const initialTabId =
 			activeTab === 'structured-parser' && !structuredParserEnabled
@@ -1231,6 +1231,10 @@ export class SettingsTab extends PluginSettingTab {
 		container.createEl('h3', { text: 'Structured Parser' })
 		container.createEl('p', {
 			text: 'An alternative to custom regex that splits cards by configurable markers.',
+			cls: 'setting-item-description'
+		})
+		container.createEl('p', {
+			text: 'To disable this, turn off Enable Structured Parser in Advanced.',
 			cls: 'setting-item-description'
 		})
 
