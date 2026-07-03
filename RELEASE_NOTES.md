@@ -1,77 +1,111 @@
 # Obsidian_to_Anki_tec 6.0.0
 
-This release turns the fork into a cleaner, more maintainable Obsidian-to-Anki workflow built on top of `Obsidian_to_Anki_Kai` 5.0.8. It keeps the AnkiConnect-based sync model while adding a redesigned settings experience, more precise sync controls, safer relinking behavior, and a structured Markdown parser for readable flashcard notes.
+`6.0.0` is the first public release of `Obsidian_to_Anki_tec`, a maintained fork of `Obsidian_to_Anki_Kai` focused on a cleaner Obsidian settings experience, safer sync behavior, and more flexible Markdown-to-Anki workflows.
 
-## Highlights
+This release is based on `Obsidian_to_Anki_Kai` 5.0.8 and keeps the existing AnkiConnect sync model.
 
-- Redesigned settings UI with tabbed sections, searchable note-type tables, clearer advanced options, and folder pickers for path-based configuration.
-- Added current-file and current-folder sync flows so users can sync focused parts of a vault without running a full vault scan.
-- Added folder-based rules for default decks and tags, plus additional scan folders and excluded folders for better vault scoping.
-- Added a Structured Parser for readable front/back cards using separators or Markdown headings, with configurable field mapping and optional context/link fields.
-- Added content-based auto relinking to recover orphaned Anki note IDs and reduce duplicate card creation when IDs are missing or stale.
-- Improved tag handling with scan tags, frontmatter tags, hierarchy conversion, and per-note-type required tags for regex-based cards.
-- Added cloze editing and reading-view quality-of-life options, including command palette actions, optional context menu actions, and rendered cloze display in Reading View.
-- Added frontmatter note ID support for single-note files, keeping source notes cleaner when inline IDs are not desired.
+## What changed
 
-## User-Facing Changes
+### Redesigned settings experience
 
-### Sync Workflow
+- Rebuilt the settings screen around focused tabs for General, Tags, Folders, Note Types, Advanced, Actions, and Parser settings.
+- Added searchable note-type tables so large Anki setups are easier to manage.
+- Added folder pickers and structured folder rule editors for scan folders, excluded folders, folder decks, and folder tags.
+- Moved advanced and experimental options into clearer sections.
 
-- New commands for syncing the entire vault, the current file, or the current folder.
-- File explorer context menu actions for syncing individual files and folders.
-- Better handling of invalid configured scan folders, with notices instead of silent failure.
-- Scan filters now respect inline tags and YAML frontmatter tags.
+### More focused sync workflows
 
-### Settings and Configuration
-
-- Settings are reorganized into focused tabs: General, Tags, Folders, Note Types, Advanced, Actions, and a conditional Parser tab.
-- Note-type configuration is easier to manage through searchable tables.
-- Folder rules can now be edited with picker-assisted controls instead of manually maintaining raw folder paths everywhere.
-- Settings import/export and maintenance actions are documented in the user guide.
+- Added commands for syncing the current file, current folder, or entire vault.
+- Added file explorer context menu actions for syncing a single Markdown file or folder.
+- Added safer handling for invalid scan folders, with user-facing notices instead of silent failures.
+- Improved scan filtering with support for inline tags and YAML frontmatter tags.
 
 ### Structured Parser
 
-- Supports separator-based cards such as question/front text followed by a configurable separator and answer/back text.
-- Supports heading-based cards where headings become card fronts.
-- Supports optional section-to-field mapping for routing sections such as Explanation or Extra into specific Anki fields.
-- Supports file link, context, and context link fields when configured.
+- Added a new Structured Parser for readable Markdown flashcards.
+- Supports separator-based cards, for example front text followed by a configurable `? #flashcard` separator.
+- Supports heading-based cards where Markdown headings become card fronts.
+- Supports configurable front/back fields, file link fields, context fields, context link fields, and section-to-field routing.
+- Parser settings appear in a dedicated Parser tab only when Structured Parser is enabled.
 
-### Reliability
+### Tag and field control
 
-- Auto Relink by Content can match orphaned source notes back to existing Anki notes instead of creating duplicates.
-- Regex compatibility was improved for patterns using PCRE-style end anchors such as `\Z` and `\z`.
-- Vault link and context handling was improved for more reliable source references.
-- AnkiConnect API key handling and connection errors were clarified.
+- Added frontmatter tag sync.
+- Added Anki hierarchy conversion for slash-separated tags.
+- Added per-note-type required tags for regex-based card extraction.
+- Added alias fields, context fields, and file link field controls per note type.
+
+### Reliability and duplicate prevention
+
+- Added content-based auto relinking for orphaned Anki note IDs.
+- Improved handling for stale or missing note IDs to reduce accidental duplicate card creation.
+- Improved compatibility for PCRE-style regex end anchors such as `\Z` and `\z`.
+- Improved vault link and context handling for more reliable source references.
+- Clarified AnkiConnect API key setup and connection error messages.
+
+### Cloze and editing quality-of-life
+
+- Added command palette actions for adding and removing Anki cloze markup.
+- Added optional editor context menu support for cloze creation/removal.
+- Added optional Reading View rendering for cloze text.
+- Added optional highlighted Reading View cloze rendering.
 
 ### Documentation
 
 - Reworked the README for installation, AnkiConnect setup, feature overview, and release links.
-- Added a full `FEATURES_GUIDE.md` covering sync commands, tag handling, folder rules, structured parser, advanced options, troubleshooting, and release resources.
-- Updated redesign notes to explain the UI direction and parser tab behavior.
+- Added `FEATURES_GUIDE.md` with detailed user-facing documentation for sync commands, tag handling, folder rules, Structured Parser, advanced options, troubleshooting, and release resources.
+- Updated redesign notes to document the UI direction and parser tab behavior.
 
 ## Maintenance
 
 - Bumped plugin metadata to `6.0.0`.
-- Aligned release workflow files with the main release flow.
-- Pruned obsolete Python-era scripts and legacy generated/config files that are no longer part of this Obsidian plugin release.
-- Removed old image assets from the upstream documentation set to keep the fork smaller and focused.
+- Added release-ready bundled plugin assets.
+- Removed obsolete Python-era files and legacy generated/config files from the maintained plugin core.
+- Removed old upstream documentation image assets that are no longer used by this fork.
 - Removed a tracked backup settings file and added `*.backup` to `.gitignore`.
 - Removed personal contact information from the Code of Conduct.
 - Removed avoidable debug logging from shipped TypeScript source.
 
-## Compatibility
+## Installation
 
-- Minimum Obsidian app version remains `0.9.20`.
-- Desktop only.
-- Requires Anki with AnkiConnect installed and running while syncing.
+### BRAT
 
-## Upgrade Notes
+1. Install BRAT from Obsidian Community Plugins.
+2. Add this beta plugin repository:
 
-- Install or update through BRAT using `https://github.com/bd-tec/obsidian_to_anki_tec`, or manually install `main.js`, `manifest.json`, and `styles.css` from the release assets.
-- Keep Anki running during sync.
+```text
+https://github.com/bd-tec/obsidian_to_anki_tec
+```
+
+3. Enable `Obsidian_to_Anki_tec` in Obsidian.
+
+### Manual install
+
+Download these release assets and place them in:
+
+```text
+<Vault>/.obsidian/plugins/obsidian-to-anki-plugin/
+```
+
+Required files:
+
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+## Requirements
+
+- Obsidian desktop.
+- Minimum Obsidian app version: `0.9.20`.
+- Anki desktop with AnkiConnect installed.
+- Anki must be running while syncing.
+
+## Upgrade notes
+
 - If using Structured Parser, enable it in Advanced settings and configure the Parser tab before syncing structured notes.
-- If using frontmatter note IDs, start with single-note files; multi-note files continue to use inline IDs.
+- If using frontmatter note IDs, start with single-note files. Multi-note files continue to use inline IDs.
+- Keep Anki open during sync so AnkiConnect can receive requests.
 
-## Base Comparison
+## Base comparison
 
 Compared against local upstream reference `activefork/master` at `Obsidian_to_Anki_Kai` 5.0.8.
