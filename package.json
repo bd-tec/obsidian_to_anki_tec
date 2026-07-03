@@ -26,7 +26,7 @@
         "@wdio/local-runner": "^8.6.9",
         "@wdio/mocha-framework": "^8.16.17",
         "@wdio/spec-reporter": "^8.12.2",
-        "glob": "^10.3.10",
+        "glob": "^13.0.6",
         "obsidian": "^1.4.11",
         "rollup": "2.79.1",
         "rollup-plugin-node-polyfills": "^0.2.1",
