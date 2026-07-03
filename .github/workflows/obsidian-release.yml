@@ -47,7 +47,7 @@ jobs:
          zip -r ${{ env.PLUGIN_NAME }}-${{ env.tag }}.zip ${{ env.PLUGIN_NAME }}
 
      - name: Release
-       uses: softprops/action-gh-release@v2
+       uses: softprops/action-gh-release@v3
        with:
          # main.css
          generate_release_notes: true
