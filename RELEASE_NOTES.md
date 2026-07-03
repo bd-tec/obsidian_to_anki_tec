@@ -55,5 +55,3 @@
 - `manifest.json`
 - `styles.css`
 - `obsidian-to-anki-plugin-6.0.0.zip`
-
-**Full Changelog:** https://github.com/bd-tec/obsidian_to_anki_tec/compare/5.0.8...6.0.0
