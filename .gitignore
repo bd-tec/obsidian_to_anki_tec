@@ -254,6 +254,7 @@ docker/docker
 .*.swp
 a.out
 *.orig
+*.backup
 build_src
 .flymake*
 .idea

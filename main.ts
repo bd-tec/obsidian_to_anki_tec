@@ -543,7 +543,6 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async onload() {
-		console.log('loading Obsidian_to_Anki...');
 		addIcon('anki', ANKI_ICON)
 		try {
 			this.settings = await this.loadSettings()
@@ -799,8 +798,6 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async onunload() {
-		console.log("Saving settings for Obsidian_to_Anki...")
 		this.saveAllData()
-		console.log('unloading Obsidian_to_Anki...');
 	}
 }

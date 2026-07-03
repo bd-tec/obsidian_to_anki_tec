@@ -300,7 +300,6 @@ export class FileManager {
         for (let file of this.ownFiles) {
             const mediaLinks = difference(file.formatter.detectedMedia, this.added_media_set)
             for (let mediaLink of mediaLinks) {
-                console.log("Adding media file: ", mediaLink)
                 const dataFile = this.app.metadataCache.getFirstLinkpathDest(mediaLink, file.path)
                 if (!(dataFile)) {
                     console.warn("Couldn't locate media file ", mediaLink)
