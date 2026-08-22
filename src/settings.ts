@@ -737,7 +737,7 @@ export class SettingsTab extends PluginSettingTab {
 					cls: 'setting-item-name'
 				})
 				headerEl.createEl('div', {
-					text: 'Evaluated in top-to-bottom order.',
+					text: 'Choose the field, capture mode, and enter the section label that should be captured.',
 					cls: 'setting-item-description'
 				})
 				const removeButton = headerEl.createEl('button', { text: 'Remove' })
