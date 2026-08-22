@@ -40,8 +40,10 @@ const defaultDescs = {
 	"Structured Parser - Front Field": "Which Anki field receives everything before the separator. Leave blank to use the first field.",
 	"Structured Parser - Back Field": "Which Anki field receives the main answer section after the separator. Leave blank to use the second field.",
 	"Structured Parser - File Link Field": "Optional field for a normal clickable Obsidian file link. Leave blank to skip it.",
+	"Structured Parser - File Link Label": "Enter custom text to display for the file link. Use {{title}} to insert the note’s filename. Leave blank to use the General label.",
 	"Structured Parser - Context Field": "Optional field for the heading/context path as plain text, not a clickable link. Leave blank to skip it.",
 	"Structured Parser - Context Link Field": "⚠️ To use this field, you must install the Advanced URI plugin.\nOptional field for a clickable direct link to the exact card location. Leave blank to skip it.",
+	"Structured Parser - Exact Card Link Label": "Enter custom text to display for the exact card link. Use {{title}} to insert the note’s filename. Leave blank for default ('Open card').",
 	"Structured Parser - Section Field Map": "Optional section routing, one per line. Example: Explanation=Extra."
 }
 
@@ -328,11 +330,17 @@ export class SettingsTab extends PluginSettingTab {
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - File Link Field"))) {
 			plugin.settings["Defaults"]["Structured Parser - File Link Field"] = ""
 		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - File Link Label"))) {
+			plugin.settings["Defaults"]["Structured Parser - File Link Label"] = ""
+		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Context Field"))) {
 			plugin.settings["Defaults"]["Structured Parser - Context Field"] = ""
 		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Context Link Field"))) {
 			plugin.settings["Defaults"]["Structured Parser - Context Link Field"] = ""
+		}
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Exact Card Link Label"))) {
+			plugin.settings["Defaults"]["Structured Parser - Exact Card Link Label"] = ""
 		}
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Section Field Map"))) {
 			plugin.settings["Defaults"]["Structured Parser - Section Field Map"] = ""
@@ -370,8 +378,10 @@ export class SettingsTab extends PluginSettingTab {
 				key === "Structured Parser - Front Field" ||
 				key === "Structured Parser - Back Field" ||
 				key === "Structured Parser - File Link Field" ||
+				key === "Structured Parser - File Link Label" ||
 				key === "Structured Parser - Context Field" ||
 				key === "Structured Parser - Context Link Field" ||
+				key === "Structured Parser - Exact Card Link Label" ||
 				key === "Structured Parser - Section Field Map") {
 				continue
 			}
@@ -1547,6 +1557,19 @@ export class SettingsTab extends PluginSettingTab {
 						this.display()
 					})
 				})
+			if (plugin.settings.Defaults["Structured Parser - File Link Field"]) {
+				new Setting(container)
+					.setName("File Link Label")
+					.setDesc(defaultDescs["Structured Parser - File Link Label"])
+					.addText(text => {
+						text.setPlaceholder('Leave blank to use General label ("Obsidian" or {{title}})')
+						text.setValue(plugin.settings.Defaults["Structured Parser - File Link Label"] || "")
+						text.onChange((value) => {
+							plugin.settings.Defaults["Structured Parser - File Link Label"] = value
+							plugin.saveAllData()
+						})
+					})
+			}
 			new Setting(container)
 				.setName("Context Path Field")
 				.setDesc(defaultDescs["Structured Parser - Context Field"])
@@ -1579,6 +1602,19 @@ export class SettingsTab extends PluginSettingTab {
 						this.display()
 					})
 				})
+			if (plugin.settings.Defaults["Structured Parser - Context Link Field"]) {
+				new Setting(container)
+					.setName("Exact Card Link Label")
+					.setDesc(defaultDescs["Structured Parser - Exact Card Link Label"])
+					.addText(text => {
+						text.setPlaceholder('Leave blank for default ("Open card")')
+						text.setValue(plugin.settings.Defaults["Structured Parser - Exact Card Link Label"] || "")
+						text.onChange((value) => {
+							plugin.settings.Defaults["Structured Parser - Exact Card Link Label"] = value
+							plugin.saveAllData()
+						})
+					})
+			}
 			this.createSectionHeader(container, 'Extra Section Routing', { level: 'h4' })
 			this.renderSectionFieldMapEditor(container, plugin, availableFields)
 		}

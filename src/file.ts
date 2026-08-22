@@ -1061,7 +1061,10 @@ export class AllFile extends AbstractFile {
             if (!identifier) continue
             const blockId = `anki-${identifier}`
             const uri = this.formatter.getAdvancedUriForBlock(this.path, blockId)
-            const fieldValue = `<a href="${uri}" class="obsidian-link">Open card</a>`
+            const labelTemplate = this.data.structured_context_link_label || "Open card"
+            const filename = basename(this.path, extname(this.path))
+            const labelText = labelTemplate.replace(/{{title}}/g, filename)
+            const fieldValue = `<a href="${uri}" class="obsidian-link">${labelText}</a>`
             entry.note.fields[contextLinkField] = fieldValue
             actions.push(AnkiConnect.updateNoteFields(identifier, { [contextLinkField]: fieldValue }))
         }

@@ -77,8 +77,10 @@ export default class MyPlugin extends Plugin {
 				"Structured Parser - Front Field": "",
 				"Structured Parser - Back Field": "",
 				"Structured Parser - File Link Field": "",
+				"Structured Parser - File Link Label": "",
 				"Structured Parser - Context Field": "",
 				"Structured Parser - Context Link Field": "",
+				"Structured Parser - Exact Card Link Label": "",
 				"Structured Parser - Section Field Map": ""
 			},
 			IGNORED_FILE_GLOBS: DEFAULT_IGNORED_FILE_GLOBS,

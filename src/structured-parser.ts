@@ -454,7 +454,8 @@ export function structuredCardToNote(
 	if (url) {
 		const linkField = data.structured_file_link_field || ""
 		if (linkField) {
-			formatter.format_note_with_url(template, url, linkField, data.link_label, filename)
+			const label = data.structured_file_link_label || data.link_label || "Obsidian"
+			formatter.format_note_with_url(template, url, linkField, label, filename)
 		}
 	}
 	if (Object.keys(frozen_fields_dict).length) {

@@ -329,8 +329,10 @@ const defaultDescs = {
     "Structured Parser - Front Field": "Which Anki field receives everything before the separator. Leave blank to use the first field.",
     "Structured Parser - Back Field": "Which Anki field receives the main answer section after the separator. Leave blank to use the second field.",
     "Structured Parser - File Link Field": "Optional field for a normal clickable Obsidian file link. Leave blank to skip it.",
+    "Structured Parser - File Link Label": "Enter custom text to display for the file link. Use {{title}} to insert the note’s filename. Leave blank to use the General label.",
     "Structured Parser - Context Field": "Optional field for the heading/context path as plain text, not a clickable link. Leave blank to skip it.",
     "Structured Parser - Context Link Field": "⚠️ To use this field, you must install the Advanced URI plugin.\nOptional field for a clickable direct link to the exact card location. Leave blank to skip it.",
+    "Structured Parser - Exact Card Link Label": "Enter custom text to display for the exact card link. Use {{title}} to insert the note’s filename. Leave blank for default ('Open card').",
     "Structured Parser - Section Field Map": "Optional section routing, one per line. Example: Explanation=Extra."
 };
 const DEFAULT_IGNORED_FILE_GLOBS = [
@@ -578,11 +580,17 @@ class SettingsTab extends obsidian.PluginSettingTab {
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - File Link Field"))) {
             plugin.settings["Defaults"]["Structured Parser - File Link Field"] = "";
         }
+        if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - File Link Label"))) {
+            plugin.settings["Defaults"]["Structured Parser - File Link Label"] = "";
+        }
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Context Field"))) {
             plugin.settings["Defaults"]["Structured Parser - Context Field"] = "";
         }
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Context Link Field"))) {
             plugin.settings["Defaults"]["Structured Parser - Context Link Field"] = "";
+        }
+        if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Exact Card Link Label"))) {
+            plugin.settings["Defaults"]["Structured Parser - Exact Card Link Label"] = "";
         }
         if (!(plugin.settings["Defaults"].hasOwnProperty("Structured Parser - Section Field Map"))) {
             plugin.settings["Defaults"]["Structured Parser - Section Field Map"] = "";
@@ -619,8 +627,10 @@ class SettingsTab extends obsidian.PluginSettingTab {
                 key === "Structured Parser - Front Field" ||
                 key === "Structured Parser - Back Field" ||
                 key === "Structured Parser - File Link Field" ||
+                key === "Structured Parser - File Link Label" ||
                 key === "Structured Parser - Context Field" ||
                 key === "Structured Parser - Context Link Field" ||
+                key === "Structured Parser - Exact Card Link Label" ||
                 key === "Structured Parser - Section Field Map") {
                 continue;
             }
@@ -1686,6 +1696,19 @@ class SettingsTab extends obsidian.PluginSettingTab {
                     this.display();
                 });
             });
+            if (plugin.settings.Defaults["Structured Parser - File Link Field"]) {
+                new obsidian.Setting(container)
+                    .setName("File Link Label")
+                    .setDesc(defaultDescs["Structured Parser - File Link Label"])
+                    .addText(text => {
+                    text.setPlaceholder('Leave blank to use General label ("Obsidian" or {{title}})');
+                    text.setValue(plugin.settings.Defaults["Structured Parser - File Link Label"] || "");
+                    text.onChange((value) => {
+                        plugin.settings.Defaults["Structured Parser - File Link Label"] = value;
+                        plugin.saveAllData();
+                    });
+                });
+            }
             new obsidian.Setting(container)
                 .setName("Context Path Field")
                 .setDesc(defaultDescs["Structured Parser - Context Field"])
@@ -1718,6 +1741,19 @@ class SettingsTab extends obsidian.PluginSettingTab {
                     this.display();
                 });
             });
+            if (plugin.settings.Defaults["Structured Parser - Context Link Field"]) {
+                new obsidian.Setting(container)
+                    .setName("Exact Card Link Label")
+                    .setDesc(defaultDescs["Structured Parser - Exact Card Link Label"])
+                    .addText(text => {
+                    text.setPlaceholder('Leave blank for default ("Open card")');
+                    text.setValue(plugin.settings.Defaults["Structured Parser - Exact Card Link Label"] || "");
+                    text.onChange((value) => {
+                        plugin.settings.Defaults["Structured Parser - Exact Card Link Label"] = value;
+                        plugin.saveAllData();
+                    });
+                });
+            }
             this.createSectionHeader(container, 'Extra Section Routing', { level: 'h4' });
             this.renderSectionFieldMapEditor(container, plugin, availableFields);
         }
@@ -2446,8 +2482,10 @@ async function settingToData(app, settings, fields_dict) {
     result.structured_front_field = settings.Defaults["Structured Parser - Front Field"] ?? "";
     result.structured_back_field = settings.Defaults["Structured Parser - Back Field"] ?? "";
     result.structured_file_link_field = settings.Defaults["Structured Parser - File Link Field"] ?? "";
+    result.structured_file_link_label = settings.Defaults["Structured Parser - File Link Label"] ?? "";
     result.structured_context_field = settings.Defaults["Structured Parser - Context Field"] ?? "";
     result.structured_context_link_field = settings.Defaults["Structured Parser - Context Link Field"] ?? "";
+    result.structured_context_link_label = settings.Defaults["Structured Parser - Exact Card Link Label"] ?? "";
     const rawRules = settings.Defaults["Structured Parser - Section Field Map"] ?? "";
     const parsedRules = parseSectionFieldRules(rawRules);
     const availableNoteFields = fields_dict[result.structured_note_type] ?? [];
@@ -67615,7 +67653,8 @@ function structuredCardToNote(card, noteType, deck, url, frozen_fields_dict, dat
     if (url) {
         const linkField = data.structured_file_link_field || "";
         if (linkField) {
-            formatter.format_note_with_url(template, url, linkField, data.link_label, filename);
+            const label = data.structured_file_link_label || data.link_label || "Obsidian";
+            formatter.format_note_with_url(template, url, linkField, label, filename);
         }
     }
     if (Object.keys(frozen_fields_dict).length) {
@@ -68532,7 +68571,10 @@ class AllFile extends AbstractFile {
                 continue;
             const blockId = `anki-${identifier}`;
             const uri = this.formatter.getAdvancedUriForBlock(this.path, blockId);
-            const fieldValue = `<a href="${uri}" class="obsidian-link">Open card</a>`;
+            const labelTemplate = this.data.structured_context_link_label || "Open card";
+            const filename = path$1.basename(this.path, path$1.extname(this.path));
+            const labelText = labelTemplate.replace(/{{title}}/g, filename);
+            const fieldValue = `<a href="${uri}" class="obsidian-link">${labelText}</a>`;
             entry.note.fields[contextLinkField] = fieldValue;
             actions.push(updateNoteFields(identifier, { [contextLinkField]: fieldValue }));
         }
@@ -71436,8 +71478,10 @@ class MyPlugin extends obsidian.Plugin {
                 "Structured Parser - Front Field": "",
                 "Structured Parser - Back Field": "",
                 "Structured Parser - File Link Field": "",
+                "Structured Parser - File Link Label": "",
                 "Structured Parser - Context Field": "",
                 "Structured Parser - Context Link Field": "",
+                "Structured Parser - Exact Card Link Label": "",
                 "Structured Parser - Section Field Map": ""
             },
             IGNORED_FILE_GLOBS: DEFAULT_IGNORED_FILE_GLOBS,

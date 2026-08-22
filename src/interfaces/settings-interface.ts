@@ -58,8 +58,10 @@ export interface PluginSettings {
 		"Structured Parser - Front Field": string,
 		"Structured Parser - Back Field": string,
 		"Structured Parser - File Link Field": string,
+		"Structured Parser - File Link Label": string,
 		"Structured Parser - Context Field": string,
 		"Structured Parser - Context Link Field": string,
+		"Structured Parser - Exact Card Link Label": string,
 		"Structured Parser - Section Field Map": string
 	},
 	IGNORED_FILE_GLOBS: string[]
@@ -116,8 +118,10 @@ export interface FileData {
 	structured_front_field: string
 	structured_back_field: string
 	structured_file_link_field: string
+	structured_file_link_label: string
 	structured_context_field: string
 	structured_context_link_field: string
+	structured_context_link_label: string
 	structured_section_field_map: Record<string, string>
 	structured_section_rules: SectionRule[]
 }

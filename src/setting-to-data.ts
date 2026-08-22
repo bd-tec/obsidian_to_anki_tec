@@ -167,8 +167,10 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     result.structured_front_field = settings.Defaults["Structured Parser - Front Field"] ?? "";
     result.structured_back_field = settings.Defaults["Structured Parser - Back Field"] ?? "";
     result.structured_file_link_field = settings.Defaults["Structured Parser - File Link Field"] ?? "";
+    result.structured_file_link_label = settings.Defaults["Structured Parser - File Link Label"] ?? "";
     result.structured_context_field = settings.Defaults["Structured Parser - Context Field"] ?? "";
     result.structured_context_link_field = settings.Defaults["Structured Parser - Context Link Field"] ?? "";
+    result.structured_context_link_label = settings.Defaults["Structured Parser - Exact Card Link Label"] ?? "";
 
     const rawRules = settings.Defaults["Structured Parser - Section Field Map"] ?? ""
     const parsedRules = parseSectionFieldRules(rawRules)

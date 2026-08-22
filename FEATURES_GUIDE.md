@@ -502,8 +502,9 @@ Enable: Open **Settings -> Parser -> File Link Field** and choose a destination 
 
 Usage:
 
-- stores a link back to the source note
+- stores a clickable link back to the source note
 - leave it blank if you do not want a file link for structured parser cards
+- optionally set **File Link Label** to customize the visible link text (e.g. `File Link`, `Open Note`, or `{{title}}` to insert the note's filename). Leave blank to use the General label.
 
 ### Context Path
 
@@ -513,7 +514,7 @@ Enable: Open **Settings -> Parser -> Context Path Field** and choose a destinati
 
 Usage:
 
-- stores path and heading context as text
+- stores path and heading context as plain text (e.g. `Folder/Note > Topic > Subtopic`)
 - useful when multiple cards come from long topic notes
 - leave it blank to skip it
 
@@ -527,7 +528,8 @@ Usage:
 
 - creates a more precise link than a normal file link
 - uses the generated block ID for that card, such as `anki-<id>`
-- useful when you want Anki to jump directly to the exact source block
+- jumps directly to the exact card location inside your markdown note
+- optionally set **Exact Card Link Label** to customize the visible link text (e.g. `Open Card`, `{{title}} - Card`). Defaults to `Open card` if blank.
 
 ⚠️ Important:
 
