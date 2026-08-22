@@ -744,27 +744,31 @@ export class SettingsTab extends PluginSettingTab {
 			rules.forEach((rule, index) => {
 				const ruleEl = listEl.createDiv({ cls: 'anki-section-rule-item' })
 				const headerEl = ruleEl.createDiv({ cls: 'anki-section-rule-header' })
-				headerEl.createEl('div', {
+				const titleContainer = headerEl.createDiv({ cls: 'anki-section-rule-title-container' })
+				titleContainer.createEl('div', {
 					text: `Rule ${index + 1}`,
 					cls: 'setting-item-name'
 				})
-				headerEl.createEl('div', {
-					text: 'Choose the field, capture mode, and enter the section label that should be captured.',
+				titleContainer.createEl('div', {
+					text: 'Choose the destination field, capture mode, and note label.',
 					cls: 'setting-item-description'
 				})
-				const removeButton = headerEl.createEl('button', { text: 'Remove' })
+				const removeButton = headerEl.createEl('button', { text: 'Remove', cls: 'anki-section-rule-remove-btn' })
 				removeButton.addEventListener('click', () => {
 					rules.splice(index, 1)
 					saveRules()
 					renderRules()
 				})
 
-				const rowEl = ruleEl.createDiv({ cls: 'anki-section-rule-row' })
-				rowEl.createEl('label', {
-					text: 'Field',
-					cls: 'anki-section-rule-label'
+				const controlsEl = ruleEl.createDiv({ cls: 'anki-section-rule-controls' })
+
+				// 1. Target Field Column
+				const fieldCol = controlsEl.createDiv({ cls: 'anki-section-rule-col' })
+				fieldCol.createEl('label', {
+					text: 'Target Field',
+					cls: 'anki-section-rule-col-label'
 				})
-				const fieldSelect = rowEl.createEl('select')
+				const fieldSelect = fieldCol.createEl('select')
 				fieldSelect.addClass('anki-section-rule-input')
 				const emptyOption = fieldSelect.createEl('option', { text: 'Select field' })
 				emptyOption.value = ''
@@ -778,7 +782,13 @@ export class SettingsTab extends PluginSettingTab {
 					saveRules()
 				})
 
-				const modeSelect = rowEl.createEl('select')
+				// 2. Capture Mode Column
+				const modeCol = controlsEl.createDiv({ cls: 'anki-section-rule-col' })
+				modeCol.createEl('label', {
+					text: 'Capture Mode',
+					cls: 'anki-section-rule-col-label'
+				})
+				const modeSelect = modeCol.createEl('select')
 				modeSelect.addClass('anki-section-rule-input')
 				const modes: { value: SectionCaptureMode, label: string }[] = [
 					{ value: 'section', label: 'Until next section' },
@@ -792,9 +802,15 @@ export class SettingsTab extends PluginSettingTab {
 				}
 				modeSelect.value = rule.mode || 'section'
 
-				const triggerInput = rowEl.createEl('input', {
+				// 3. Section Label Column
+				const labelCol = controlsEl.createDiv({ cls: 'anki-section-rule-col' })
+				labelCol.createEl('label', {
+					text: 'Section Label in Note',
+					cls: 'anki-section-rule-col-label'
+				})
+				const triggerInput = labelCol.createEl('input', {
 					type: 'text',
-					placeholder: 'Section label in note (e.g. Ans, Explanation)',
+					placeholder: 'e.g. Ans, Explanation',
 					value: (rule.mode === 'remainder' ? '*' : (rule.label || ''))
 				})
 				triggerInput.addClass('anki-section-rule-input')
@@ -807,7 +823,7 @@ export class SettingsTab extends PluginSettingTab {
 						rules[index].label = '*'
 					} else {
 						triggerInput.disabled = false
-						triggerInput.placeholder = 'Section label in note (e.g. Ans, Explanation)'
+						triggerInput.placeholder = 'e.g. Ans, Explanation'
 						if (triggerInput.value === '*') {
 							triggerInput.value = ''
 							rules[index].label = ''
