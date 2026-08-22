@@ -678,7 +678,6 @@ export class SettingsTab extends PluginSettingTab {
 	}
 
 	renderSectionFieldMapEditor(container: HTMLElement, plugin: any, availableFields: string[]) {
-		const exampleTargetField = this.getSectionTargetFields(plugin, availableFields)[0] || "Additional Field"
 		const sectionTargetFields = this.getSectionTargetFields(plugin, availableFields)
 		const rules = this.parseSectionFieldMap(plugin.settings.Defaults["Structured Parser - Section Field Map"] || "")
 			.filter(rule => !rule.field || sectionTargetFields.includes(rule.field))
@@ -687,12 +686,45 @@ export class SettingsTab extends PluginSettingTab {
 			plugin.settings.Defaults["Structured Parser - Section Field Map"] = this.serializeSectionFieldMap(rules)
 			plugin.saveAllData()
 		}
+
+		new Setting(wrapper)
+			.setName("Section Field Map")
+			.setDesc("Route labeled sections to Anki fields. Rules are evaluated in order from top to bottom.")
+			.addButton(button => {
+				button
+					.setButtonText("+")
+					.setTooltip("Add section rule")
+					.setDisabled(sectionTargetFields.length === 0)
+					.onClick(() => {
+						rules.push({
+							label: "",
+							field: sectionTargetFields[0] || "",
+							mode: "section"
+						})
+						saveRules()
+						renderRules()
+					})
+			})
+
+		const mainDesc = wrapper.createEl('div', {
+			cls: 'setting-item-description anki-section-map-main-desc'
+		})
+		mainDesc.createEl('div', {
+			text: "• For specific sections (e.g. Ans, Explanation): Enter the label text to capture."
+		})
+		mainDesc.createEl('div', {
+			text: "• For catch-all remainder: Select 'Everything else (remainder)' or enter '*' as your final rule to capture all leftover content."
+		})
+		mainDesc.createEl('div', {
+			text: "• If no rules are added, the Back field keeps everything after the separator."
+		})
+
 		const listEl = wrapper.createDiv({ cls: "anki-section-map-rule-list" })
 		const renderRules = () => {
 			listEl.empty()
 			if (rules.length === 0) {
 				listEl.createEl('div', {
-					text: "No section rules added yet.",
+					text: "No section rules added yet. Click '+' above to add a rule.",
 					cls: 'setting-item-description'
 				})
 				return
@@ -705,7 +737,7 @@ export class SettingsTab extends PluginSettingTab {
 					cls: 'setting-item-name'
 				})
 				headerEl.createEl('div', {
-					text: 'Rules are evaluated in order from top to bottom. Specific rules first, remainder last.',
+					text: 'Evaluated in top-to-bottom order.',
 					cls: 'setting-item-description'
 				})
 				const removeButton = headerEl.createEl('button', { text: 'Remove' })
@@ -750,20 +782,20 @@ export class SettingsTab extends PluginSettingTab {
 
 				const triggerInput = rowEl.createEl('input', {
 					type: 'text',
-					placeholder: 'Section label in note',
+					placeholder: 'Section label in note (e.g. Ans, Explanation)',
 					value: (rule.mode === 'remainder' ? '*' : (rule.label || ''))
 				})
 				triggerInput.addClass('anki-section-rule-input')
 
 				const updateInputState = () => {
-					if (modeSelect.value === 'remainder') {
+					if (modeSelect.value === 'remainder' || rule.mode === 'remainder') {
 						triggerInput.disabled = true
-						triggerInput.placeholder = '(Everything else)'
+						triggerInput.placeholder = '(Everything else / wildcard *)'
 						triggerInput.value = '*'
 						rules[index].label = '*'
 					} else {
 						triggerInput.disabled = false
-						triggerInput.placeholder = 'Section label in note'
+						triggerInput.placeholder = 'Section label in note (e.g. Ans, Explanation)'
 						if (triggerInput.value === '*') {
 							triggerInput.value = ''
 							rules[index].label = ''
@@ -778,35 +810,29 @@ export class SettingsTab extends PluginSettingTab {
 					saveRules()
 				})
 
+				triggerInput.addEventListener('input', () => {
+					if (triggerInput.value.trim() === '*') {
+						rules[index].mode = 'remainder'
+						modeSelect.value = 'remainder'
+						updateInputState()
+						saveRules()
+					}
+				})
+
 				triggerInput.addEventListener('change', () => {
-					rules[index].label = triggerInput.value
+					if (triggerInput.value.trim() === '*') {
+						rules[index].label = '*'
+						rules[index].mode = 'remainder'
+						modeSelect.value = 'remainder'
+						updateInputState()
+					} else {
+						rules[index].label = triggerInput.value
+					}
 					saveRules()
 				})
 			})
 		}
 
-		new Setting(wrapper)
-			.setName("Section Field Map")
-			.setDesc(`Use the + button to route labeled sections into additional fields only. Example target field: ${exampleTargetField}.`)
-			.addButton(button => {
-				button
-					.setButtonText("+")
-					.setTooltip("Add section rule")
-					.setDisabled(sectionTargetFields.length === 0)
-					.onClick(() => {
-						rules.push({
-							label: "",
-							field: sectionTargetFields[0] || "",
-							mode: "section"
-						})
-						saveRules()
-						renderRules()
-					})
-			})
-		wrapper.createEl('div', {
-			text: "Add rules to route sections to additional fields. Rules process top-to-bottom. If no rules are added, Back keeps everything after the separator.",
-			cls: 'setting-item-description'
-		})
 		renderRules()
 	}
 
