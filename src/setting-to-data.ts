@@ -51,15 +51,9 @@ export function parseSectionFieldRules(raw: string): SectionRule[] {
 
 export function filterSectionRules(
     rules: SectionRule[],
-    availableFields: string[],
-    frontField: string,
-    backField: string,
-    fileLinkField: string,
-    contextField: string,
-    contextLinkField: string
+    availableFields: string[]
 ): SectionRule[] {
-    const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean))
-    const allowed = new Set(availableFields.filter(field => !reserved.has(field)))
+    const allowed = new Set(availableFields)
     return rules.filter(rule => allowed.has(rule.field))
 }
 
@@ -74,15 +68,9 @@ function parseSectionFieldMap(raw: string): Record<string, string> {
 
 function filterSectionFieldMap(
     mapping: Record<string, string>,
-    availableFields: string[],
-    frontField: string,
-    backField: string,
-    fileLinkField: string,
-    contextField: string,
-    contextLinkField: string
+    availableFields: string[]
 ): Record<string, string> {
-    const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean))
-    const allowed = new Set(availableFields.filter(field => !reserved.has(field)))
+    const allowed = new Set(availableFields)
     const filtered: Record<string, string> = {}
     for (let [label, field] of Object.entries(mapping)) {
         if (allowed.has(field)) {
@@ -177,12 +165,7 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     const availableNoteFields = fields_dict[result.structured_note_type] ?? []
     result.structured_section_rules = filterSectionRules(
         parsedRules,
-        availableNoteFields,
-        result.structured_front_field,
-        result.structured_back_field,
-        result.structured_file_link_field,
-        result.structured_context_field,
-        result.structured_context_link_field
+        availableNoteFields
     )
     result.structured_section_field_map = {}
     for (let rule of result.structured_section_rules) {

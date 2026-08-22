@@ -885,17 +885,10 @@ class SettingsTab extends obsidian.PluginSettingTab {
             .join('\n');
     }
     getSectionTargetFields(plugin, availableFields) {
-        const frontField = plugin.settings.Defaults["Structured Parser - Front Field"] || availableFields[0] || "";
-        const backField = plugin.settings.Defaults["Structured Parser - Back Field"] || availableFields[1] || availableFields[0] || "";
-        const fileLinkField = plugin.settings.Defaults["Structured Parser - File Link Field"] || "";
-        const contextField = plugin.settings.Defaults["Structured Parser - Context Field"] || "";
-        const contextLinkField = plugin.settings.Defaults["Structured Parser - Context Link Field"] || "";
-        const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean));
-        return availableFields.filter(field => !reserved.has(field));
+        return availableFields || [];
     }
     normalizeSectionFieldMap(raw, availableFields) {
-        const plugin = this.plugin;
-        const allowed = new Set(this.getSectionTargetFields(plugin, availableFields));
+        const allowed = new Set(this.getSectionTargetFields(this.plugin, availableFields));
         const rules = this.parseSectionFieldMap(raw)
             .filter(rule => allowed.has(rule.field));
         return this.serializeSectionFieldMap(rules);
@@ -2319,9 +2312,8 @@ function parseSectionFieldRules(raw) {
     }
     return rules;
 }
-function filterSectionRules(rules, availableFields, frontField, backField, fileLinkField, contextField, contextLinkField) {
-    const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean));
-    const allowed = new Set(availableFields.filter(field => !reserved.has(field)));
+function filterSectionRules(rules, availableFields) {
+    const allowed = new Set(availableFields);
     return rules.filter(rule => allowed.has(rule.field));
 }
 async function settingToData(app, settings, fields_dict) {
@@ -2404,7 +2396,7 @@ async function settingToData(app, settings, fields_dict) {
     const rawRules = settings.Defaults["Structured Parser - Section Field Map"] ?? "";
     const parsedRules = parseSectionFieldRules(rawRules);
     const availableNoteFields = fields_dict[result.structured_note_type] ?? [];
-    result.structured_section_rules = filterSectionRules(parsedRules, availableNoteFields, result.structured_front_field, result.structured_back_field, result.structured_file_link_field, result.structured_context_field, result.structured_context_link_field);
+    result.structured_section_rules = filterSectionRules(parsedRules, availableNoteFields);
     result.structured_section_field_map = {};
     for (let rule of result.structured_section_rules) {
         result.structured_section_field_map[rule.label] = rule.field;

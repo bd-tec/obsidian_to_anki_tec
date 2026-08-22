@@ -667,18 +667,11 @@ export class SettingsTab extends PluginSettingTab {
 	}
 
 	getSectionTargetFields(plugin: any, availableFields: string[]): string[] {
-		const frontField = plugin.settings.Defaults["Structured Parser - Front Field"] || availableFields[0] || ""
-		const backField = plugin.settings.Defaults["Structured Parser - Back Field"] || availableFields[1] || availableFields[0] || ""
-		const fileLinkField = plugin.settings.Defaults["Structured Parser - File Link Field"] || ""
-		const contextField = plugin.settings.Defaults["Structured Parser - Context Field"] || ""
-		const contextLinkField = plugin.settings.Defaults["Structured Parser - Context Link Field"] || ""
-		const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean))
-		return availableFields.filter(field => !reserved.has(field))
+		return availableFields || []
 	}
 
 	normalizeSectionFieldMap(raw: string, availableFields: string[]): string {
-		const plugin = (this as any).plugin
-		const allowed = new Set(this.getSectionTargetFields(plugin, availableFields))
+		const allowed = new Set(this.getSectionTargetFields((this as any).plugin, availableFields))
 		const rules = this.parseSectionFieldMap(raw)
 			.filter(rule => allowed.has(rule.field))
 		return this.serializeSectionFieldMap(rules)
