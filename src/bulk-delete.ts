@@ -9,6 +9,15 @@ export async function checkAndBulkDelete(app: App, file: TFile) {
     const matches = [...content.matchAll(regex)];
     const ids = matches.map(m => parseInt(m[1])).filter(id => !isNaN(id));
 
+    // Check for Exact Card Link Field anchors (^anki-<id>)
+    const anchorRegex = /\^anki-(\d+)/g;
+    for (const match of content.matchAll(anchorRegex)) {
+        const anchorId = parseInt(match[1]);
+        if (!isNaN(anchorId) && !ids.includes(anchorId)) {
+            ids.push(anchorId);
+        }
+    }
+
     // Check for Frontmatter ID
     let frontmatterID: number | null = null;
     const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
@@ -18,7 +27,7 @@ export async function checkAndBulkDelete(app: App, file: TFile) {
         const nidMatch = frontmatter.match(/^nid:\s*(\d+)/m);
         if (nidMatch) {
             frontmatterID = parseInt(nidMatch[1]);
-            if (!isNaN(frontmatterID)) {
+            if (!isNaN(frontmatterID) && !ids.includes(frontmatterID)) {
                 ids.push(frontmatterID);
             }
         }
@@ -48,6 +57,10 @@ export async function checkAndBulkDelete(app: App, file: TFile) {
 
         // Remove IDs from file
         let newContent = content;
+        
+        // Remove ^anki-<id> block anchors (created for Exact Card Link Field)
+        newContent = newContent.replace(/(?:\r?\n)?[ \t]*\^anki-\d+[ \t]*/g, "");
+
         // Using replace with the global regex removes all instances
         // We use the same regex ID_REGEXP_STR. 
         // Note: The regex includes optional newlines at start.
@@ -72,8 +85,8 @@ export async function checkAndBulkDelete(app: App, file: TFile) {
             });
         }
 
-        // Remove potential Double Newlines created by removal?
-        // Logic in file.ts fix_newline_ids handles this usually, but a simple replace is okay.
+        // Clean up excessive newlines left by removal
+        newContent = newContent.replace(/\n{3,}/g, "\n\n");
 
         try {
             await app.vault.modify(file, newContent);

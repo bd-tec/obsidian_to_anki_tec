@@ -70620,7 +70620,6 @@ class FileManager {
         for (let file of this.ownFiles) {
             const mediaLinks = difference(file.formatter.detectedMedia, this.added_media_set);
             for (let mediaLink of mediaLinks) {
-                console.log("Adding media file: ", mediaLink);
                 const dataFile = this.app.metadataCache.getFirstLinkpathDest(mediaLink, file.path);
                 if (!(dataFile)) {
                     console.warn("Couldn't locate media file ", mediaLink);
@@ -71030,6 +71029,14 @@ async function checkAndBulkDelete(app, file) {
     const regex = new RegExp(ID_REGEXP_STR, 'g');
     const matches = [...content.matchAll(regex)];
     const ids = matches.map(m => parseInt(m[1])).filter(id => !isNaN(id));
+    // Check for Exact Card Link Field anchors (^anki-<id>)
+    const anchorRegex = /\^anki-(\d+)/g;
+    for (const match of content.matchAll(anchorRegex)) {
+        const anchorId = parseInt(match[1]);
+        if (!isNaN(anchorId) && !ids.includes(anchorId)) {
+            ids.push(anchorId);
+        }
+    }
     // Check for Frontmatter ID
     let frontmatterID = null;
     const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
@@ -71039,7 +71046,7 @@ async function checkAndBulkDelete(app, file) {
         const nidMatch = frontmatter.match(/^nid:\s*(\d+)/m);
         if (nidMatch) {
             frontmatterID = parseInt(nidMatch[1]);
-            if (!isNaN(frontmatterID)) {
+            if (!isNaN(frontmatterID) && !ids.includes(frontmatterID)) {
                 ids.push(frontmatterID);
             }
         }
@@ -71067,6 +71074,8 @@ async function checkAndBulkDelete(app, file) {
         }
         // Remove IDs from file
         let newContent = content;
+        // Remove ^anki-<id> block anchors (created for Exact Card Link Field)
+        newContent = newContent.replace(/(?:\r?\n)?[ \t]*\^anki-\d+[ \t]*/g, "");
         // Using replace with the global regex removes all instances
         // We use the same regex ID_REGEXP_STR. 
         // Note: The regex includes optional newlines at start.
@@ -71088,8 +71097,8 @@ async function checkAndBulkDelete(app, file) {
                 return `---\n${newFm}\n---`;
             });
         }
-        // Remove potential Double Newlines created by removal?
-        // Logic in file.ts fix_newline_ids handles this usually, but a simple replace is okay.
+        // Clean up excessive newlines left by removal
+        newContent = newContent.replace(/\n{3,}/g, "\n\n");
         try {
             await app.vault.modify(file, newContent);
             new obsidian.Notice(`Deleted ${ids.length} notes from Anki and removed IDs from file.`);
@@ -71639,7 +71648,6 @@ class MyPlugin extends obsidian.Plugin {
         }
     }
     async onload() {
-        console.log('loading Obsidian_to_Anki...');
         obsidian.addIcon('anki', ANKI_ICON);
         try {
             this.settings = await this.loadSettings();
@@ -71873,9 +71881,7 @@ class MyPlugin extends obsidian.Plugin {
         }
     }
     async onunload() {
-        console.log("Saving settings for Obsidian_to_Anki...");
         this.saveAllData();
-        console.log('unloading Obsidian_to_Anki...');
     }
 }
 

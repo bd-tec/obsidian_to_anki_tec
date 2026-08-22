@@ -287,3 +287,4 @@ tests/specs_gen/*
 tests/test_outputs/*
 
 data.json
+data.json.bak
