@@ -3,6 +3,7 @@ import * as AnkiConnect from './anki'
 import { TabContainer } from './ui/TabContainer'
 import { SearchableTable } from './ui/SearchableTable'
 import { FolderSuggestModal, getAllFolders } from './ui/FolderSuggester'
+import { SectionRule, SectionCaptureMode } from './interfaces/settings-interface'
 
 const defaultDescs = {
 	"Scan Directory": "The directory to scan. Leave empty to scan the entire vault",
@@ -619,8 +620,8 @@ export class SettingsTab extends PluginSettingTab {
 		}
 	}
 
-	parseSectionFieldMap(raw: string): { label: string, field: string }[] {
-		const rules: { label: string, field: string }[] = []
+	parseSectionFieldMap(raw: string): SectionRule[] {
+		const rules: SectionRule[] = []
 		if (!raw) return rules
 		for (let line of raw.split('\n')) {
 			const trimmed = line.trim()
@@ -628,21 +629,40 @@ export class SettingsTab extends PluginSettingTab {
 			const separatorIndex = trimmed.includes('=>') ? trimmed.indexOf('=>') : trimmed.indexOf('=')
 			if (separatorIndex === -1) continue
 			const label = trimmed.slice(0, separatorIndex).trim()
-			const field = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim()
-			if (!label || !field) continue
-			rules.push({ label, field })
+			let rest = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim()
+			if (!rest) continue
+
+			let field = rest
+			let mode: SectionCaptureMode = "section"
+
+			const colonIdx = rest.lastIndexOf(':')
+			if (colonIdx !== -1) {
+				const possibleMode = rest.slice(colonIdx + 1).trim().toLowerCase()
+				if (possibleMode === "section" || possibleMode === "line" || possibleMode === "end" || possibleMode === "remainder") {
+					field = rest.slice(0, colonIdx).trim()
+					mode = possibleMode as SectionCaptureMode
+				}
+			}
+
+			if (label === "*" || mode === "remainder") {
+				mode = "remainder"
+			}
+
+			if (!field) continue
+			rules.push({ label, field, mode })
 		}
 		return rules
 	}
 
-	serializeSectionFieldMap(rules: { label: string, field: string }[]): string {
+	serializeSectionFieldMap(rules: SectionRule[]): string {
 		return rules
 			.map(rule => ({
-				label: rule.label.trim(),
-				field: rule.field.trim()
+				label: (rule.mode === 'remainder' ? '*' : rule.label.trim()),
+				field: rule.field.trim(),
+				mode: rule.mode || 'section'
 			}))
-			.filter(rule => rule.label.length > 0 && rule.field.length > 0)
-			.map(rule => `${rule.label}=${rule.field}`)
+			.filter(rule => (rule.label.length > 0 || rule.mode === 'remainder') && rule.field.length > 0)
+			.map(rule => `${rule.label}=${rule.field}:${rule.mode}`)
 			.join('\n')
 	}
 
@@ -692,7 +712,7 @@ export class SettingsTab extends PluginSettingTab {
 					cls: 'setting-item-name'
 				})
 				headerEl.createEl('div', {
-					text: 'Choose the additional field, then enter the section label that should be captured.',
+					text: 'Rules are evaluated in order from top to bottom. Specific rules first, remainder last.',
 					cls: 'setting-item-description'
 				})
 				const removeButton = headerEl.createEl('button', { text: 'Remove' })
@@ -720,12 +740,51 @@ export class SettingsTab extends PluginSettingTab {
 					rules[index].field = fieldSelect.value
 					saveRules()
 				})
+
+				const modeSelect = rowEl.createEl('select')
+				modeSelect.addClass('anki-section-rule-input')
+				const modes: { value: SectionCaptureMode, label: string }[] = [
+					{ value: 'section', label: 'Until next section' },
+					{ value: 'line', label: 'Until line break' },
+					{ value: 'end', label: 'Until card end' },
+					{ value: 'remainder', label: 'Everything else (remainder)' }
+				]
+				for (let m of modes) {
+					const opt = modeSelect.createEl('option', { text: m.label })
+					opt.value = m.value
+				}
+				modeSelect.value = rule.mode || 'section'
+
 				const triggerInput = rowEl.createEl('input', {
 					type: 'text',
 					placeholder: 'Section label in note',
-					value: rule.label || ''
+					value: (rule.mode === 'remainder' ? '*' : (rule.label || ''))
 				})
 				triggerInput.addClass('anki-section-rule-input')
+
+				const updateInputState = () => {
+					if (modeSelect.value === 'remainder') {
+						triggerInput.disabled = true
+						triggerInput.placeholder = '(Everything else)'
+						triggerInput.value = '*'
+						rules[index].label = '*'
+					} else {
+						triggerInput.disabled = false
+						triggerInput.placeholder = 'Section label in note'
+						if (triggerInput.value === '*') {
+							triggerInput.value = ''
+							rules[index].label = ''
+						}
+					}
+				}
+				updateInputState()
+
+				modeSelect.addEventListener('change', () => {
+					rules[index].mode = modeSelect.value as SectionCaptureMode
+					updateInputState()
+					saveRules()
+				})
+
 				triggerInput.addEventListener('change', () => {
 					rules[index].label = triggerInput.value
 					saveRules()
@@ -744,14 +803,15 @@ export class SettingsTab extends PluginSettingTab {
 					.onClick(() => {
 						rules.push({
 							label: "",
-							field: sectionTargetFields[0] || ""
+							field: sectionTargetFields[0] || "",
+							mode: "section"
 						})
 						saveRules()
 						renderRules()
 					})
 			})
 		wrapper.createEl('div', {
-			text: "Add a rule only when a labeled section should go to a separate Anki field. If no rules are added, Back keeps everything after the separator.",
+			text: "Add rules to route sections to additional fields. Rules process top-to-bottom. If no rules are added, Back keeps everything after the separator.",
 			cls: 'setting-item-description'
 		})
 		renderRules()

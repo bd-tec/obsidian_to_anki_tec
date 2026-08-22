@@ -333,7 +333,7 @@ div + .anki-settings-header {
 
 .anki-section-rule-row {
   display: grid;
-  grid-template-columns: 72px 180px minmax(0, 1fr);
+  grid-template-columns: 45px minmax(120px, 1.2fr) minmax(150px, 1.3fr) minmax(150px, 1.5fr);
   gap: 8px;
   align-items: center;
 }

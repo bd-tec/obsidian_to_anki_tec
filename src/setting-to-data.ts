@@ -1,4 +1,4 @@
-import { PluginSettings, ParsedSettings } from './interfaces/settings-interface'
+import { PluginSettings, ParsedSettings, SectionRule, SectionCaptureMode } from './interfaces/settings-interface'
 import { App, Notice } from 'obsidian'
 import * as AnkiConnect from './anki'
 import { ID_REGEXP_STR } from './note'
@@ -15,18 +15,59 @@ function sanitizeRegexSource(source: string): string {
     return source.replace(/(?<!\\)\\([Zz])/g, '$')
 }
 
-function parseSectionFieldMap(raw: string): Record<string, string> {
-    const result: Record<string, string> = {}
-    if (!raw) return result
+export function parseSectionFieldRules(raw: string): SectionRule[] {
+    const rules: SectionRule[] = []
+    if (!raw) return rules
     for (let line of raw.split('\n')) {
         const trimmed = line.trim()
         if (!trimmed) continue
         const separatorIndex = trimmed.includes('=>') ? trimmed.indexOf('=>') : trimmed.indexOf('=')
         if (separatorIndex === -1) continue
         const label = trimmed.slice(0, separatorIndex).trim()
-        const field = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim()
-        if (!label || !field) continue
-        result[label] = field
+        let rest = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim()
+        if (!rest) continue
+
+        let field = rest
+        let mode: SectionCaptureMode = "section"
+
+        const colonIdx = rest.lastIndexOf(':')
+        if (colonIdx !== -1) {
+            const possibleMode = rest.slice(colonIdx + 1).trim().toLowerCase()
+            if (possibleMode === "section" || possibleMode === "line" || possibleMode === "end" || possibleMode === "remainder") {
+                field = rest.slice(0, colonIdx).trim()
+                mode = possibleMode as SectionCaptureMode
+            }
+        }
+
+        if (label === "*" || mode === "remainder") {
+            mode = "remainder"
+        }
+
+        if (!field) continue
+        rules.push({ label, field, mode })
+    }
+    return rules
+}
+
+export function filterSectionRules(
+    rules: SectionRule[],
+    availableFields: string[],
+    frontField: string,
+    backField: string,
+    fileLinkField: string,
+    contextField: string,
+    contextLinkField: string
+): SectionRule[] {
+    const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean))
+    const allowed = new Set(availableFields.filter(field => !reserved.has(field)))
+    return rules.filter(rule => allowed.has(rule.field))
+}
+
+function parseSectionFieldMap(raw: string): Record<string, string> {
+    const result: Record<string, string> = {}
+    const rules = parseSectionFieldRules(raw)
+    for (let rule of rules) {
+        result[rule.label] = rule.field
     }
     return result
 }
@@ -52,7 +93,7 @@ function filterSectionFieldMap(
 }
 
 export async function settingToData(app: App, settings: PluginSettings, fields_dict: Record<string, string[]>): Promise<ParsedSettings> {
-    let result: ParsedSettings = <ParsedSettings>{}
+    let result: ParsedSettings = {} as ParsedSettings
 
     //Some processing required
     const adapter = app.vault.adapter as { getBasePath?: () => string }
@@ -130,14 +171,22 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     result.structured_file_link_field = settings.Defaults["Structured Parser - File Link Field"] ?? "";
     result.structured_context_field = settings.Defaults["Structured Parser - Context Field"] ?? "";
     result.structured_context_link_field = settings.Defaults["Structured Parser - Context Link Field"] ?? "";
-    result.structured_section_field_map = filterSectionFieldMap(
-        parseSectionFieldMap(settings.Defaults["Structured Parser - Section Field Map"] ?? ""),
-        fields_dict[result.structured_note_type] ?? [],
+
+    const rawRules = settings.Defaults["Structured Parser - Section Field Map"] ?? ""
+    const parsedRules = parseSectionFieldRules(rawRules)
+    const availableNoteFields = fields_dict[result.structured_note_type] ?? []
+    result.structured_section_rules = filterSectionRules(
+        parsedRules,
+        availableNoteFields,
         result.structured_front_field,
         result.structured_back_field,
         result.structured_file_link_field,
         result.structured_context_field,
         result.structured_context_link_field
-    );
+    )
+    result.structured_section_field_map = {}
+    for (let rule of result.structured_section_rules) {
+        result.structured_section_field_map[rule.label] = rule.field
+    }
     return result
 }

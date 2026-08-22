@@ -65,6 +65,14 @@ export interface PluginSettings {
 	IGNORED_FILE_GLOBS: string[]
 }
 
+export type SectionCaptureMode = "section" | "line" | "end" | "remainder"
+
+export interface SectionRule {
+	label: string
+	field: string
+	mode: SectionCaptureMode
+}
+
 export interface FileData {
 	//All the data that a file would need.
 	fields_dict: FIELDS_DICT
@@ -111,6 +119,7 @@ export interface FileData {
 	structured_context_field: string
 	structured_context_link_field: string
 	structured_section_field_map: Record<string, string>
+	structured_section_rules: SectionRule[]
 }
 
 export interface ParsedSettings extends FileData {

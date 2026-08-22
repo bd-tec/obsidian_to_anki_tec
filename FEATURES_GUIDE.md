@@ -536,46 +536,56 @@ Usage:
 
 ### Section Field Map
 
-This routes labeled sections into specific Anki fields.
+This routes labeled sections into specific Anki fields with configurable capture modes.
 
 Enable: Open **Settings -> Parser -> Section Field Map** after selecting a note type with available fields.
 
 Usage:
 
-- write one mapping per line in the format `Label=Field`
-- the label is what you write in the note
-- the field is the Anki field that should receive that section
+- add rules using the `+` button, ordered from top to bottom
+- select destination **Field**, **Capture Mode**, and enter the **Section label**
+- rules are evaluated in top-to-bottom order; specific rules should be placed first, and remainder rules last
+- multiple rules routed to the same destination field automatically merge and append with clean spacing
 
-Example mapping:
+#### Capture Modes
 
-```text
-Explanation=Extra
-Ref=Source
-```
+| Mode | Behavior |
+|:---|:---|
+| `Until next section` | Default. Captures from the matching label until the next section heading. |
+| `Until line break` | Captures only the matching label's paragraph until the first blank line. Ideal for single-line answers like `**Ans:** T T F F F`. |
+| `Until card end` | Captures from the matching label all the way to the card end marker (`---`) or end of file. |
+| `Everything else (remainder)` | Catch-all. Captures all remaining content not claimed by earlier rules. Place as the final rule. |
 
-Example note:
+#### Example: Q&A with Answer line and Extra explanations
+
+Note format:
 
 ```md
-What is the treatment of choice for anaphylaxis?
-
+**1. Hypokalemia is manifested by:**
+a) Polyurea
+b) Polydipsia
 ? #flashcard
 
-Intramuscular epinephrine.
+**Ans:** T T F F F
 
-**Explanation**
-Give IM epinephrine early in the lateral thigh. Airway, oxygen, IV fluids, and monitoring are also important.
+**Question Explanation:**
+- Hypokalemia affects muscle, nerve, and renal functions.
 
-**Ref**
-Emergency guideline summary
+**Option Explanation:**
+- **a) Polyurea (True):** Nephrogenic DI-like effect.
+- **b) Polydipsia (True):** Secondary polydipsia.
 ---
 ```
 
-Result:
+Configured Rules:
+- **Rule 1**: Field: `Answer` | Mode: `Until line break` | Label: `Ans`
+- **Rule 2**: Field: `Extra` | Mode: `Everything else (remainder)` | Label: `*`
 
-- the question text goes to the front field
-- the main answer goes to the back field
-- the `Explanation` block goes to `Extra`
-- the `Ref` block goes to `Source`
+Result:
+- **Front Field (`Question`)**: `**1. Hypokalemia is manifested by:**\na) Polyurea\nb) Polydipsia`
+- **Field 2 (`Answer`)**: `**Ans:** T T F F F`
+- **Field 3 (`Extra`)**: Both `Question Explanation` and `Option Explanation` blocks merged together!
+- **End-of-page safe**: Works whether `---` is present or omitted on the last card.
 
 ## Advanced Actions
 

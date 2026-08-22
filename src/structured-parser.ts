@@ -1,7 +1,7 @@
 import { FormatConverter } from './format'
 import { FROZEN_FIELDS_DICT } from './interfaces/field-interface'
 import { AnkiConnectNote, AnkiConnectNoteAndID } from './interfaces/note-interface'
-import { FileData } from './interfaces/settings-interface'
+import { FileData, SectionRule } from './interfaces/settings-interface'
 import { ID_REGEXP_STR, TAG_SEP } from './note'
 
 const OBS_TAG_REGEXP: RegExp = /#([a-zA-Z0-9_\u00C0-\uFFFF\/\-]+)/g
@@ -71,8 +71,8 @@ function splitAnswerAndExtra(back: string): { answer: string, extra: string } {
 function stripFormattingForLabel(text: string): string {
 	return text
 		.replace(/^ {0,3}#{1,6}\s+/, '')
-		.replace(/^\*\*/, '')
-		.replace(/\*\*:?$/, '')
+		.replace(/^[*_]+/, '')
+		.replace(/[*_]+$/, '')
 		.replace(/:$/, '')
 		.trim()
 		.toLowerCase()
@@ -88,53 +88,119 @@ function normalizeConfiguredSectionLabel(text: string): string {
 		.toLowerCase()
 }
 
-function matchSectionLabel(line: string, sectionLabels: string[]): string | null {
-	const exactNormalized = stripFormattingForLabel(line)
-	const normalizedLabels = sectionLabels.map(label => ({
-		raw: label,
-		normalized: normalizeConfiguredSectionLabel(label)
-	}))
-	const exactMatch = normalizedLabels.find(label => exactNormalized === label.normalized)
-	if (exactMatch) {
-		return exactMatch.raw
+function normalizeRules(rulesInput?: Record<string, string> | SectionRule[]): SectionRule[] {
+	if (!rulesInput) return []
+	if (Array.isArray(rulesInput)) return rulesInput
+	const out: SectionRule[] = []
+	for (let [label, field] of Object.entries(rulesInput)) {
+		out.push({ label, field, mode: (label === "*" ? "remainder" : "section") })
 	}
-	for (let label of normalizedLabels) {
-		if (!label.normalized) continue
-		const inlinePattern = new RegExp(`^\\s*(?:#{1,6}\\s+)?(?:\\*\\*|__|\\*|_)?\\s*${escapeRegex(label.normalized)}\\s*(?:\\*\\*|__|\\*|_)?\\s*:?\\s+.+$`, 'i')
-		if (inlinePattern.test(line.trim())) {
-			return label.raw
-		}
-	}
-	return null
+	return out
 }
 
-function findRoutedSections(back: string, sectionFieldMap: Record<string, string>): { answer: string, sections: Record<string, string> } {
+function matchRuleLabel(line: string, label: string): boolean {
+	if (!label || label === "*") return false
+	const exactNormalized = stripFormattingForLabel(line)
+	const normalizedLabel = normalizeConfiguredSectionLabel(label)
+	if (exactNormalized === normalizedLabel) return true
+	const inlinePattern = new RegExp(
+		`^\\s*(?:#{1,6}\\s+)?(?:\\*\\*|__|\\*|_)?\\s*${escapeRegex(normalizedLabel)}:?\\s*(?:\\*\\*|__|\\*|_)?\\s*:?\\s+.+$`,
+		'i'
+	)
+	return inlinePattern.test(line.trim())
+}
+
+function applyRoutingRules(back: string, rulesInput?: Record<string, string> | SectionRule[]): { answer: string, sections: Record<string, string> } {
 	const cleaned = stripIDLines(back).replace(/^\s+/, '')
-	const sectionLabels = Object.keys(sectionFieldMap)
-	if (sectionLabels.length === 0) {
+	const rules = normalizeRules(rulesInput)
+	if (rules.length === 0) {
 		return { answer: cleaned, sections: {} }
 	}
+
 	const lines = cleaned.split('\n')
+	const claimed = new Set<number>()
 	const sections: Record<string, string> = {}
-	let currentLabel: string | null = null
-	let answerLines: string[] = []
-	for (let line of lines) {
-		const matchedLabel = matchSectionLabel(line, sectionLabels)
-		if (matchedLabel) {
-			currentLabel = matchedLabel
-			if (!sections[currentLabel]) {
-				sections[currentLabel] = line
-			} else {
-				sections[currentLabel] += "\n" + line
-			}
-			continue
+
+	function isHeadingOrRule(line: string, currentLabel: string): boolean {
+		for (let r of rules) {
+			if (r.label !== currentLabel && matchRuleLabel(line, r.label)) return true
 		}
-		if (currentLabel) {
-			sections[currentLabel] += "\n" + line
+		return /^(?: {0,3}#{1,6}\s+|\*\*[A-Z][^*]+\*\*:?)/.test(line.trim())
+	}
+
+	// 1. Process specific rules in order
+	for (let rule of rules) {
+		if (rule.mode === 'remainder' || rule.label === '*') continue
+
+		let startIdx = -1
+		for (let i = 0; i < lines.length; i++) {
+			if (!claimed.has(i) && matchRuleLabel(lines[i], rule.label)) {
+				startIdx = i
+				break
+			}
+		}
+		if (startIdx === -1) continue
+
+		const capturedLines: string[] = []
+		if (rule.mode === 'line') {
+			for (let i = startIdx; i < lines.length; i++) {
+				if (claimed.has(i)) break
+				if (i > startIdx && lines[i].trim() === '') {
+					claimed.add(i)
+					break
+				}
+				if (i > startIdx && isHeadingOrRule(lines[i], rule.label)) break
+				capturedLines.push(lines[i])
+				claimed.add(i)
+			}
+		} else if (rule.mode === 'end') {
+			for (let i = startIdx; i < lines.length; i++) {
+				if (claimed.has(i)) continue
+				capturedLines.push(lines[i])
+				claimed.add(i)
+			}
 		} else {
-			answerLines.push(line)
+			// default "section" mode
+			for (let i = startIdx; i < lines.length; i++) {
+				if (claimed.has(i)) break
+				if (i > startIdx && isHeadingOrRule(lines[i], rule.label)) break
+				capturedLines.push(lines[i])
+				claimed.add(i)
+			}
+		}
+
+		if (capturedLines.length > 0) {
+			const text = capturedLines.join('\n').trim()
+			if (sections[rule.label]) {
+				sections[rule.label] += '\n\n' + text
+			} else {
+				sections[rule.label] = text
+			}
 		}
 	}
+
+	// 2. Process remainder rule if present
+	const remainderRule = rules.find(r => r.mode === 'remainder' || r.label === '*')
+	if (remainderRule) {
+		const unclaimedLines: string[] = []
+		for (let i = 0; i < lines.length; i++) {
+			if (!claimed.has(i)) {
+				unclaimedLines.push(lines[i])
+				claimed.add(i)
+			}
+		}
+		const key = remainderRule.label || '*'
+		sections[key] = unclaimedLines.join('\n').trim()
+	}
+
+	// 3. Any unclaimed lines become the answer (Back Field)
+	const answerLines: string[] = []
+	for (let i = 0; i < lines.length; i++) {
+		if (!claimed.has(i)) {
+			answerLines.push(lines[i])
+		}
+	}
+
 	return {
 		answer: answerLines.join('\n').trim(),
 		sections
@@ -178,7 +244,7 @@ function splitOnHigherLevelHeadings(blocks: TextBlock[], includeFromHeadingLevel
 
 function blockTextByEndMarker(text: string, cardEndMarker: string): TextBlock[] {
 	const endMarkerEscaped = cardEndMarker ? escapeRegex(cardEndMarker) : null
-	const endLineRegex = endMarkerEscaped ? new RegExp(`^[ \\t]*${endMarkerEscaped}[ \\t]*$`, 'm') : null
+	const endLineRegex = endMarkerEscaped ? new RegExp(`^[ \t]*${endMarkerEscaped}[ \t]*$`, 'm') : null
 	const blocks: TextBlock[] = []
 	if (endLineRegex) {
 		const globalEnd = new RegExp(endLineRegex.source, 'gm')
@@ -204,12 +270,13 @@ function structuredCardFromParts(
 	blockStartOffset: number,
 	cardStartInBlock: number,
 	backStartInBlock: number,
-	sectionFieldMap: Record<string, string>
+	sectionRulesInput?: Record<string, string> | SectionRule[]
 ): StructuredCard {
-	const routed = findRoutedSections(back, sectionFieldMap)
+	const rules = normalizeRules(sectionRulesInput)
+	const routed = applyRoutingRules(back, rules)
 	const fallback = splitAnswerAndExtra(back)
-	const answer = Object.keys(sectionFieldMap).length > 0 ? routed.answer : fallback.answer
-	const extra = Object.keys(sectionFieldMap).length > 0 ? "" : fallback.extra
+	const answer = rules.length > 0 ? routed.answer : fallback.answer
+	const extra = rules.length > 0 ? "" : fallback.extra
 
 	const idRegex = new RegExp(ID_REGEXP_STR, 'g')
 	const anchorRegex = /\^anki-\d+/g
@@ -240,7 +307,7 @@ function parseHeadingStructuredCards(
 	text: string,
 	cardEndMarker: string,
 	headingLevel: number,
-	sectionFieldMap: Record<string, string>
+	sectionRulesInput?: Record<string, string> | SectionRule[]
 ): StructuredCard[] {
 	const normalizedHeadingLevel = Math.min(Math.max(headingLevel || 2, 1), 6)
 	const headingMarks = "#".repeat(normalizedHeadingLevel)
@@ -264,7 +331,7 @@ function parseHeadingStructuredCards(
 			block.startOffset,
 			cardStartInBlock,
 			backStartInBlock,
-			sectionFieldMap
+			sectionRulesInput
 		))
 	}
 	return cards
@@ -275,12 +342,12 @@ export function parseStructuredCards(
 	separator: string,
 	cardEndMarker: string,
 	includeFromHeadingLevel: number = 0,
-	sectionFieldMap: Record<string, string> = {},
+	sectionRulesInput?: Record<string, string> | SectionRule[],
 	cardSource: string = "separator",
 	headingLevel: number = 2
 ): StructuredCard[] {
 	if ((cardSource as StructuredCardSource) === "heading") {
-		return parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionFieldMap)
+		return parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionRulesInput)
 	}
 	if (!separator) return []
 	const sepRegex = separatorToRegex(separator)
@@ -301,7 +368,7 @@ export function parseStructuredCards(
 			block.startOffset,
 			0,
 			sepIndex + sepMatch[0].length,
-			sectionFieldMap
+			sectionRulesInput
 		))
 	}
 	return cards
@@ -321,6 +388,7 @@ export function structuredCardToNote(
 	globalTagsStr: string
 ): AnkiConnectNoteAndID {
 	const fieldNames = data.fields_dict[noteType] || []
+	const sectionRules = data.structured_section_rules || []
 	const sectionFieldMap = data.structured_section_field_map || {}
 	const template: AnkiConnectNote = JSON.parse(JSON.stringify(data.template))
 	template.modelName = noteType
@@ -334,16 +402,39 @@ export function structuredCardToNote(
 		fields[frontField] = formatter.format(card.front.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim()
 	}
 	if (backField) {
-		const backText = Object.keys(sectionFieldMap).length > 0
+		const backText = (sectionRules.length > 0 || Object.keys(sectionFieldMap).length > 0)
 			? card.answer
 			: (card.answer + (card.extra ? "\n\n" + card.extra : ""))
-		fields[backField] = formatter.format(backText.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim()
+		if (backText.trim()) {
+			fields[backField] = formatter.format(backText.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim()
+		}
 	}
-	for (let label of Object.keys(sectionFieldMap)) {
-		const targetField = sectionFieldMap[label]
-		const sectionValue = card.routedSections[label]
-		if (!targetField || !sectionValue || !(targetField in fields)) continue
-		fields[targetField] = formatter.format(sectionValue.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim()
+
+	if (sectionRules.length > 0) {
+		for (let rule of sectionRules) {
+			const targetField = rule.field
+			const key = rule.label || "*"
+			const sectionValue = card.routedSections[key]
+			if (!targetField || !sectionValue || !(targetField in fields)) continue
+			const formatted = formatter.format(sectionValue.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim()
+			if (fields[targetField]) {
+				fields[targetField] += "<br><br>" + formatted
+			} else {
+				fields[targetField] = formatted
+			}
+		}
+	} else {
+		for (let label of Object.keys(sectionFieldMap)) {
+			const targetField = sectionFieldMap[label]
+			const sectionValue = card.routedSections[label]
+			if (!targetField || !sectionValue || !(targetField in fields)) continue
+			const formatted = formatter.format(sectionValue.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim()
+			if (fields[targetField]) {
+				fields[targetField] += "<br><br>" + formatted
+			} else {
+				fields[targetField] = formatted
+			}
+		}
 	}
 
 	if (data.add_obs_tags) {
@@ -384,3 +475,4 @@ export function structuredCardToNote(
 	template.tags.push(...globalTagsStr.split(TAG_SEP).filter(tag => tag.length > 0))
 	return { note: template, identifier: card.identifier }
 }
+

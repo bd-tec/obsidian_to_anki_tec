@@ -851,21 +851,37 @@ class SettingsTab extends obsidian.PluginSettingTab {
             if (separatorIndex === -1)
                 continue;
             const label = trimmed.slice(0, separatorIndex).trim();
-            const field = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim();
-            if (!label || !field)
+            let rest = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim();
+            if (!rest)
                 continue;
-            rules.push({ label, field });
+            let field = rest;
+            let mode = "section";
+            const colonIdx = rest.lastIndexOf(':');
+            if (colonIdx !== -1) {
+                const possibleMode = rest.slice(colonIdx + 1).trim().toLowerCase();
+                if (possibleMode === "section" || possibleMode === "line" || possibleMode === "end" || possibleMode === "remainder") {
+                    field = rest.slice(0, colonIdx).trim();
+                    mode = possibleMode;
+                }
+            }
+            if (label === "*" || mode === "remainder") {
+                mode = "remainder";
+            }
+            if (!field)
+                continue;
+            rules.push({ label, field, mode });
         }
         return rules;
     }
     serializeSectionFieldMap(rules) {
         return rules
             .map(rule => ({
-            label: rule.label.trim(),
-            field: rule.field.trim()
+            label: (rule.mode === 'remainder' ? '*' : rule.label.trim()),
+            field: rule.field.trim(),
+            mode: rule.mode || 'section'
         }))
-            .filter(rule => rule.label.length > 0 && rule.field.length > 0)
-            .map(rule => `${rule.label}=${rule.field}`)
+            .filter(rule => (rule.label.length > 0 || rule.mode === 'remainder') && rule.field.length > 0)
+            .map(rule => `${rule.label}=${rule.field}:${rule.mode}`)
             .join('\n');
     }
     getSectionTargetFields(plugin, availableFields) {
@@ -912,7 +928,7 @@ class SettingsTab extends obsidian.PluginSettingTab {
                     cls: 'setting-item-name'
                 });
                 headerEl.createEl('div', {
-                    text: 'Choose the additional field, then enter the section label that should be captured.',
+                    text: 'Rules are evaluated in order from top to bottom. Specific rules first, remainder last.',
                     cls: 'setting-item-description'
                 });
                 const removeButton = headerEl.createEl('button', { text: 'Remove' });
@@ -939,12 +955,47 @@ class SettingsTab extends obsidian.PluginSettingTab {
                     rules[index].field = fieldSelect.value;
                     saveRules();
                 });
+                const modeSelect = rowEl.createEl('select');
+                modeSelect.addClass('anki-section-rule-input');
+                const modes = [
+                    { value: 'section', label: 'Until next section' },
+                    { value: 'line', label: 'Until line break' },
+                    { value: 'end', label: 'Until card end' },
+                    { value: 'remainder', label: 'Everything else (remainder)' }
+                ];
+                for (let m of modes) {
+                    const opt = modeSelect.createEl('option', { text: m.label });
+                    opt.value = m.value;
+                }
+                modeSelect.value = rule.mode || 'section';
                 const triggerInput = rowEl.createEl('input', {
                     type: 'text',
                     placeholder: 'Section label in note',
-                    value: rule.label || ''
+                    value: (rule.mode === 'remainder' ? '*' : (rule.label || ''))
                 });
                 triggerInput.addClass('anki-section-rule-input');
+                const updateInputState = () => {
+                    if (modeSelect.value === 'remainder') {
+                        triggerInput.disabled = true;
+                        triggerInput.placeholder = '(Everything else)';
+                        triggerInput.value = '*';
+                        rules[index].label = '*';
+                    }
+                    else {
+                        triggerInput.disabled = false;
+                        triggerInput.placeholder = 'Section label in note';
+                        if (triggerInput.value === '*') {
+                            triggerInput.value = '';
+                            rules[index].label = '';
+                        }
+                    }
+                };
+                updateInputState();
+                modeSelect.addEventListener('change', () => {
+                    rules[index].mode = modeSelect.value;
+                    updateInputState();
+                    saveRules();
+                });
                 triggerInput.addEventListener('change', () => {
                     rules[index].label = triggerInput.value;
                     saveRules();
@@ -962,14 +1013,15 @@ class SettingsTab extends obsidian.PluginSettingTab {
                 .onClick(() => {
                 rules.push({
                     label: "",
-                    field: sectionTargetFields[0] || ""
+                    field: sectionTargetFields[0] || "",
+                    mode: "section"
                 });
                 saveRules();
                 renderRules();
             });
         });
         wrapper.createEl('div', {
-            text: "Add a rule only when a labeled section should go to a separate Anki field. If no rules are added, Back keeps everything after the separator.",
+            text: "Add rules to route sections to additional fields. Rules process top-to-bottom. If no rules are added, Back keeps everything after the separator.",
             cls: 'setting-item-description'
         });
         renderRules();
@@ -2233,10 +2285,10 @@ function sanitizeRegexSource(source) {
     // Rewrite PCRE-style end-of-string escapes so they behave in JS regexes.
     return source.replace(/(?<!\\)\\([Zz])/g, '$');
 }
-function parseSectionFieldMap(raw) {
-    const result = {};
+function parseSectionFieldRules(raw) {
+    const rules = [];
     if (!raw)
-        return result;
+        return rules;
     for (let line of raw.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed)
@@ -2245,23 +2297,32 @@ function parseSectionFieldMap(raw) {
         if (separatorIndex === -1)
             continue;
         const label = trimmed.slice(0, separatorIndex).trim();
-        const field = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim();
-        if (!label || !field)
+        let rest = trimmed.slice(separatorIndex + (trimmed.includes('=>') ? 2 : 1)).trim();
+        if (!rest)
             continue;
-        result[label] = field;
+        let field = rest;
+        let mode = "section";
+        const colonIdx = rest.lastIndexOf(':');
+        if (colonIdx !== -1) {
+            const possibleMode = rest.slice(colonIdx + 1).trim().toLowerCase();
+            if (possibleMode === "section" || possibleMode === "line" || possibleMode === "end" || possibleMode === "remainder") {
+                field = rest.slice(0, colonIdx).trim();
+                mode = possibleMode;
+            }
+        }
+        if (label === "*" || mode === "remainder") {
+            mode = "remainder";
+        }
+        if (!field)
+            continue;
+        rules.push({ label, field, mode });
     }
-    return result;
+    return rules;
 }
-function filterSectionFieldMap(mapping, availableFields, frontField, backField, fileLinkField, contextField, contextLinkField) {
+function filterSectionRules(rules, availableFields, frontField, backField, fileLinkField, contextField, contextLinkField) {
     const reserved = new Set([frontField, backField, fileLinkField, contextField, contextLinkField].filter(Boolean));
     const allowed = new Set(availableFields.filter(field => !reserved.has(field)));
-    const filtered = {};
-    for (let [label, field] of Object.entries(mapping)) {
-        if (allowed.has(field)) {
-            filtered[label] = field;
-        }
-    }
-    return filtered;
+    return rules.filter(rule => allowed.has(rule.field));
 }
 async function settingToData(app, settings, fields_dict) {
     let result = {};
@@ -2340,7 +2401,14 @@ async function settingToData(app, settings, fields_dict) {
     result.structured_file_link_field = settings.Defaults["Structured Parser - File Link Field"] ?? "";
     result.structured_context_field = settings.Defaults["Structured Parser - Context Field"] ?? "";
     result.structured_context_link_field = settings.Defaults["Structured Parser - Context Link Field"] ?? "";
-    result.structured_section_field_map = filterSectionFieldMap(parseSectionFieldMap(settings.Defaults["Structured Parser - Section Field Map"] ?? ""), fields_dict[result.structured_note_type] ?? [], result.structured_front_field, result.structured_back_field, result.structured_file_link_field, result.structured_context_field, result.structured_context_link_field);
+    const rawRules = settings.Defaults["Structured Parser - Section Field Map"] ?? "";
+    const parsedRules = parseSectionFieldRules(rawRules);
+    const availableNoteFields = fields_dict[result.structured_note_type] ?? [];
+    result.structured_section_rules = filterSectionRules(parsedRules, availableNoteFields, result.structured_front_field, result.structured_back_field, result.structured_file_link_field, result.structured_context_field, result.structured_context_link_field);
+    result.structured_section_field_map = {};
+    for (let rule of result.structured_section_rules) {
+        result.structured_section_field_map[rule.label] = rule.field;
+    }
     return result;
 }
 
@@ -67168,8 +67236,8 @@ function splitAnswerAndExtra(back) {
 function stripFormattingForLabel(text) {
     return text
         .replace(/^ {0,3}#{1,6}\s+/, '')
-        .replace(/^\*\*/, '')
-        .replace(/\*\*:?$/, '')
+        .replace(/^[*_]+/, '')
+        .replace(/[*_]+$/, '')
         .replace(/:$/, '')
         .trim()
         .toLowerCase();
@@ -67183,53 +67251,118 @@ function normalizeConfiguredSectionLabel(text) {
         .trim()
         .toLowerCase();
 }
-function matchSectionLabel(line, sectionLabels) {
-    const exactNormalized = stripFormattingForLabel(line);
-    const normalizedLabels = sectionLabels.map(label => ({
-        raw: label,
-        normalized: normalizeConfiguredSectionLabel(label)
-    }));
-    const exactMatch = normalizedLabels.find(label => exactNormalized === label.normalized);
-    if (exactMatch) {
-        return exactMatch.raw;
+function normalizeRules(rulesInput) {
+    if (!rulesInput)
+        return [];
+    if (Array.isArray(rulesInput))
+        return rulesInput;
+    const out = [];
+    for (let [label, field] of Object.entries(rulesInput)) {
+        out.push({ label, field, mode: (label === "*" ? "remainder" : "section") });
     }
-    for (let label of normalizedLabels) {
-        if (!label.normalized)
-            continue;
-        const inlinePattern = new RegExp(`^\\s*(?:#{1,6}\\s+)?(?:\\*\\*|__|\\*|_)?\\s*${escapeRegex(label.normalized)}\\s*(?:\\*\\*|__|\\*|_)?\\s*:?\\s+.+$`, 'i');
-        if (inlinePattern.test(line.trim())) {
-            return label.raw;
-        }
-    }
-    return null;
+    return out;
 }
-function findRoutedSections(back, sectionFieldMap) {
+function matchRuleLabel(line, label) {
+    if (!label || label === "*")
+        return false;
+    const exactNormalized = stripFormattingForLabel(line);
+    const normalizedLabel = normalizeConfiguredSectionLabel(label);
+    if (exactNormalized === normalizedLabel)
+        return true;
+    const inlinePattern = new RegExp(`^\\s*(?:#{1,6}\\s+)?(?:\\*\\*|__|\\*|_)?\\s*${escapeRegex(normalizedLabel)}:?\\s*(?:\\*\\*|__|\\*|_)?\\s*:?\\s+.+$`, 'i');
+    return inlinePattern.test(line.trim());
+}
+function applyRoutingRules(back, rulesInput) {
     const cleaned = stripIDLines(back).replace(/^\s+/, '');
-    const sectionLabels = Object.keys(sectionFieldMap);
-    if (sectionLabels.length === 0) {
+    const rules = normalizeRules(rulesInput);
+    if (rules.length === 0) {
         return { answer: cleaned, sections: {} };
     }
     const lines = cleaned.split('\n');
+    const claimed = new Set();
     const sections = {};
-    let currentLabel = null;
-    let answerLines = [];
-    for (let line of lines) {
-        const matchedLabel = matchSectionLabel(line, sectionLabels);
-        if (matchedLabel) {
-            currentLabel = matchedLabel;
-            if (!sections[currentLabel]) {
-                sections[currentLabel] = line;
-            }
-            else {
-                sections[currentLabel] += "\n" + line;
-            }
-            continue;
+    function isHeadingOrRule(line, currentLabel) {
+        for (let r of rules) {
+            if (r.label !== currentLabel && matchRuleLabel(line, r.label))
+                return true;
         }
-        if (currentLabel) {
-            sections[currentLabel] += "\n" + line;
+        return /^(?: {0,3}#{1,6}\s+|\*\*[A-Z][^*]+\*\*:?)/.test(line.trim());
+    }
+    // 1. Process specific rules in order
+    for (let rule of rules) {
+        if (rule.mode === 'remainder' || rule.label === '*')
+            continue;
+        let startIdx = -1;
+        for (let i = 0; i < lines.length; i++) {
+            if (!claimed.has(i) && matchRuleLabel(lines[i], rule.label)) {
+                startIdx = i;
+                break;
+            }
+        }
+        if (startIdx === -1)
+            continue;
+        const capturedLines = [];
+        if (rule.mode === 'line') {
+            for (let i = startIdx; i < lines.length; i++) {
+                if (claimed.has(i))
+                    break;
+                if (i > startIdx && lines[i].trim() === '') {
+                    claimed.add(i);
+                    break;
+                }
+                if (i > startIdx && isHeadingOrRule(lines[i], rule.label))
+                    break;
+                capturedLines.push(lines[i]);
+                claimed.add(i);
+            }
+        }
+        else if (rule.mode === 'end') {
+            for (let i = startIdx; i < lines.length; i++) {
+                if (claimed.has(i))
+                    continue;
+                capturedLines.push(lines[i]);
+                claimed.add(i);
+            }
         }
         else {
-            answerLines.push(line);
+            // default "section" mode
+            for (let i = startIdx; i < lines.length; i++) {
+                if (claimed.has(i))
+                    break;
+                if (i > startIdx && isHeadingOrRule(lines[i], rule.label))
+                    break;
+                capturedLines.push(lines[i]);
+                claimed.add(i);
+            }
+        }
+        if (capturedLines.length > 0) {
+            const text = capturedLines.join('\n').trim();
+            if (sections[rule.label]) {
+                sections[rule.label] += '\n\n' + text;
+            }
+            else {
+                sections[rule.label] = text;
+            }
+        }
+    }
+    // 2. Process remainder rule if present
+    const remainderRule = rules.find(r => r.mode === 'remainder' || r.label === '*');
+    if (remainderRule) {
+        const unclaimedLines = [];
+        for (let i = 0; i < lines.length; i++) {
+            if (!claimed.has(i)) {
+                unclaimedLines.push(lines[i]);
+                claimed.add(i);
+            }
+        }
+        const key = remainderRule.label || '*';
+        sections[key] = unclaimedLines.join('\n').trim();
+    }
+    // 3. Any unclaimed lines become the answer (Back Field)
+    const answerLines = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (!claimed.has(i)) {
+            answerLines.push(lines[i]);
         }
     }
     return {
@@ -67273,7 +67406,7 @@ function splitOnHigherLevelHeadings(blocks, includeFromHeadingLevel) {
 }
 function blockTextByEndMarker(text, cardEndMarker) {
     const endMarkerEscaped = cardEndMarker ? escapeRegex(cardEndMarker) : null;
-    const endLineRegex = endMarkerEscaped ? new RegExp(`^[ \\t]*${endMarkerEscaped}[ \\t]*$`, 'm') : null;
+    const endLineRegex = endMarkerEscaped ? new RegExp(`^[ \t]*${endMarkerEscaped}[ \t]*$`, 'm') : null;
     const blocks = [];
     if (endLineRegex) {
         const globalEnd = new RegExp(endLineRegex.source, 'gm');
@@ -67294,11 +67427,12 @@ function blockTextByEndMarker(text, cardEndMarker) {
     }
     return blocks;
 }
-function structuredCardFromParts(front, back, blockStartOffset, cardStartInBlock, backStartInBlock, sectionFieldMap) {
-    const routed = findRoutedSections(back, sectionFieldMap);
+function structuredCardFromParts(front, back, blockStartOffset, cardStartInBlock, backStartInBlock, sectionRulesInput) {
+    const rules = normalizeRules(sectionRulesInput);
+    const routed = applyRoutingRules(back, rules);
     const fallback = splitAnswerAndExtra(back);
-    const answer = Object.keys(sectionFieldMap).length > 0 ? routed.answer : fallback.answer;
-    const extra = Object.keys(sectionFieldMap).length > 0 ? "" : fallback.extra;
+    const answer = rules.length > 0 ? routed.answer : fallback.answer;
+    const extra = rules.length > 0 ? "" : fallback.extra;
     const idRegex = new RegExp(ID_REGEXP_STR, 'g');
     const anchorRegex = /\^anki-\d+/g;
     let idMatch;
@@ -67322,7 +67456,7 @@ function structuredCardFromParts(front, back, blockStartOffset, cardStartInBlock
         hasAnchor
     };
 }
-function parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionFieldMap) {
+function parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionRulesInput) {
     const normalizedHeadingLevel = Math.min(Math.max(headingLevel || 2, 1), 6);
     const headingMarks = "#".repeat(normalizedHeadingLevel);
     const headingRegex = new RegExp(`(^|\\n)( {0,3})${escapeRegex(headingMarks)}\\s+(.+?)[ \\t]*(?:\\r?\\n|$)`);
@@ -67338,13 +67472,13 @@ function parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionF
         const back = block.text.slice(backStartInBlock);
         if (!front.trim() || !back.trim())
             continue;
-        cards.push(structuredCardFromParts(front, back, block.startOffset, cardStartInBlock, backStartInBlock, sectionFieldMap));
+        cards.push(structuredCardFromParts(front, back, block.startOffset, cardStartInBlock, backStartInBlock, sectionRulesInput));
     }
     return cards;
 }
-function parseStructuredCards(text, separator, cardEndMarker, includeFromHeadingLevel = 0, sectionFieldMap = {}, cardSource = "separator", headingLevel = 2) {
+function parseStructuredCards(text, separator, cardEndMarker, includeFromHeadingLevel = 0, sectionRulesInput, cardSource = "separator", headingLevel = 2) {
     if (cardSource === "heading") {
-        return parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionFieldMap);
+        return parseHeadingStructuredCards(text, cardEndMarker, headingLevel, sectionRulesInput);
     }
     if (!separator)
         return [];
@@ -67359,12 +67493,13 @@ function parseStructuredCards(text, separator, cardEndMarker, includeFromHeading
         const sepIndex = sepMatch.index;
         const front = blockText.slice(0, sepIndex);
         const back = blockText.slice(sepIndex + sepMatch[0].length);
-        cards.push(structuredCardFromParts(front, back, block.startOffset, 0, sepIndex + sepMatch[0].length, sectionFieldMap));
+        cards.push(structuredCardFromParts(front, back, block.startOffset, 0, sepIndex + sepMatch[0].length, sectionRulesInput));
     }
     return cards;
 }
 function structuredCardToNote(card, noteType, deck, url, frozen_fields_dict, data, formatter, context, aliases, filename, globalTagsStr) {
     const fieldNames = data.fields_dict[noteType] || [];
+    const sectionRules = data.structured_section_rules || [];
     const sectionFieldMap = data.structured_section_field_map || {};
     const template = JSON.parse(JSON.stringify(data.template));
     template.modelName = noteType;
@@ -67378,17 +67513,43 @@ function structuredCardToNote(card, noteType, deck, url, frozen_fields_dict, dat
         fields[frontField] = formatter.format(card.front.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim();
     }
     if (backField) {
-        const backText = Object.keys(sectionFieldMap).length > 0
+        const backText = (sectionRules.length > 0 || Object.keys(sectionFieldMap).length > 0)
             ? card.answer
             : (card.answer + (card.extra ? "\n\n" + card.extra : ""));
-        fields[backField] = formatter.format(backText.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim();
+        if (backText.trim()) {
+            fields[backField] = formatter.format(backText.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim();
+        }
     }
-    for (let label of Object.keys(sectionFieldMap)) {
-        const targetField = sectionFieldMap[label];
-        const sectionValue = card.routedSections[label];
-        if (!targetField || !sectionValue || !(targetField in fields))
-            continue;
-        fields[targetField] = formatter.format(sectionValue.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim();
+    if (sectionRules.length > 0) {
+        for (let rule of sectionRules) {
+            const targetField = rule.field;
+            const key = rule.label || "*";
+            const sectionValue = card.routedSections[key];
+            if (!targetField || !sectionValue || !(targetField in fields))
+                continue;
+            const formatted = formatter.format(sectionValue.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim();
+            if (fields[targetField]) {
+                fields[targetField] += "<br><br>" + formatted;
+            }
+            else {
+                fields[targetField] = formatted;
+            }
+        }
+    }
+    else {
+        for (let label of Object.keys(sectionFieldMap)) {
+            const targetField = sectionFieldMap[label];
+            const sectionValue = card.routedSections[label];
+            if (!targetField || !sectionValue || !(targetField in fields))
+                continue;
+            const formatted = formatter.format(sectionValue.trim(), noteType.includes(data.cloze_keyword) && data.curly_cloze, data.highlights_to_cloze).trim();
+            if (fields[targetField]) {
+                fields[targetField] += "<br><br>" + formatted;
+            }
+            else {
+                fields[targetField] = formatted;
+            }
+        }
     }
     if (data.add_obs_tags) {
         const tags = [];
@@ -67946,7 +68107,7 @@ class AllFile extends AbstractFile {
             return;
         if (!(this.data.fields_dict.hasOwnProperty(noteType)))
             return;
-        const cards = parseStructuredCards(this.file, this.data.structured_separator, this.data.structured_card_end, this.data.structured_include_heading_level, this.data.structured_section_field_map, this.data.structured_card_source, this.data.structured_heading_level);
+        const cards = parseStructuredCards(this.file, this.data.structured_separator, this.data.structured_card_end, this.data.structured_include_heading_level, this.data.structured_section_rules || this.data.structured_section_field_map, this.data.structured_card_source, this.data.structured_heading_level);
         const filename = path$1.basename(this.path, path$1.extname(this.path));
         for (let card of cards) {
             this.ignore_spans.push([card.startOffset, card.idWriteOffset]);
