@@ -1570,15 +1570,21 @@ class SettingsTab extends obsidian.PluginSettingTab {
             });
         });
         if (availableFields.length > 0) {
+            const selectedFront = plugin.settings.Defaults["Structured Parser - Front Field"] || availableFields[0] || "";
+            const selectedBack = plugin.settings.Defaults["Structured Parser - Back Field"] || "";
+            const selectedFileLink = plugin.settings.Defaults["Structured Parser - File Link Field"] || "";
+            const selectedContext = plugin.settings.Defaults["Structured Parser - Context Field"] || "";
+            const selectedExactCard = plugin.settings.Defaults["Structured Parser - Context Link Field"] || "";
+            const frontOptions = availableFields.filter(f => f === selectedFront || (f !== selectedBack && f !== selectedFileLink && f !== selectedContext && f !== selectedExactCard));
             new obsidian.Setting(container)
                 .setName("Front Field")
                 .setDesc(defaultDescs["Structured Parser - Front Field"])
                 .addDropdown(dropdown => {
                 dropdown.addOption("", "Auto");
-                for (let field of availableFields) {
+                for (let field of frontOptions) {
                     dropdown.addOption(field, field);
                 }
-                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Front Field"] || "");
+                dropdown.setValue(frontOptions.includes(selectedFront) ? selectedFront : "");
                 dropdown.onChange((value) => {
                     plugin.settings.Defaults["Structured Parser - Front Field"] = value;
                     plugin.saveAllData();
@@ -1586,15 +1592,16 @@ class SettingsTab extends obsidian.PluginSettingTab {
                     this.display();
                 });
             });
+            const backOptions = availableFields.filter(f => f === selectedBack || (f !== selectedFront && f !== selectedFileLink && f !== selectedContext && f !== selectedExactCard));
             new obsidian.Setting(container)
                 .setName("Back Field")
                 .setDesc(defaultDescs["Structured Parser - Back Field"])
                 .addDropdown(dropdown => {
                 dropdown.addOption("", "Auto");
-                for (let field of availableFields) {
+                for (let field of backOptions) {
                     dropdown.addOption(field, field);
                 }
-                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Back Field"] || "");
+                dropdown.setValue(backOptions.includes(selectedBack) ? selectedBack : "");
                 dropdown.onChange((value) => {
                     plugin.settings.Defaults["Structured Parser - Back Field"] = value;
                     plugin.saveAllData();
@@ -1680,15 +1687,21 @@ class SettingsTab extends obsidian.PluginSettingTab {
         }
         if (availableFields.length > 0) {
             this.createSectionHeader(container, 'Auto Fields', { level: 'h4' });
+            const selectedFront = plugin.settings.Defaults["Structured Parser - Front Field"] || availableFields[0] || "";
+            const selectedFileLink = plugin.settings.Defaults["Structured Parser - File Link Field"] || "";
+            const selectedContext = plugin.settings.Defaults["Structured Parser - Context Field"] || "";
+            const selectedExactCard = plugin.settings.Defaults["Structured Parser - Context Link Field"] || "";
+            // 1. File Link Field Dropdown (excludes selected Front, Context Path, and Exact Card Link)
+            const fileLinkOptions = availableFields.filter(f => f === selectedFileLink || (f !== selectedFront && f !== selectedContext && f !== selectedExactCard));
             new obsidian.Setting(container)
                 .setName("File Link Field")
                 .setDesc(defaultDescs["Structured Parser - File Link Field"])
                 .addDropdown(dropdown => {
                 dropdown.addOption("", "Blank");
-                for (let field of availableFields) {
+                for (let field of fileLinkOptions) {
                     dropdown.addOption(field, field);
                 }
-                dropdown.setValue(plugin.settings.Defaults["Structured Parser - File Link Field"] || "");
+                dropdown.setValue(fileLinkOptions.includes(selectedFileLink) ? selectedFileLink : "");
                 dropdown.onChange((value) => {
                     plugin.settings.Defaults["Structured Parser - File Link Field"] = value;
                     plugin.saveAllData();
@@ -1709,15 +1722,17 @@ class SettingsTab extends obsidian.PluginSettingTab {
                     });
                 });
             }
+            // 2. Context Path Field Dropdown (excludes selected Front, File Link, and Exact Card Link)
+            const contextOptions = availableFields.filter(f => f === selectedContext || (f !== selectedFront && f !== selectedFileLink && f !== selectedExactCard));
             new obsidian.Setting(container)
                 .setName("Context Path Field")
                 .setDesc(defaultDescs["Structured Parser - Context Field"])
                 .addDropdown(dropdown => {
                 dropdown.addOption("", "Blank");
-                for (let field of availableFields) {
+                for (let field of contextOptions) {
                     dropdown.addOption(field, field);
                 }
-                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Field"] || "");
+                dropdown.setValue(contextOptions.includes(selectedContext) ? selectedContext : "");
                 dropdown.onChange((value) => {
                     plugin.settings.Defaults["Structured Parser - Context Field"] = value;
                     plugin.saveAllData();
@@ -1725,15 +1740,17 @@ class SettingsTab extends obsidian.PluginSettingTab {
                     this.display();
                 });
             });
+            // 3. Exact Card Link Field Dropdown (excludes selected Front, File Link, and Context Path)
+            const exactCardOptions = availableFields.filter(f => f === selectedExactCard || (f !== selectedFront && f !== selectedFileLink && f !== selectedContext));
             new obsidian.Setting(container)
                 .setName("Exact Card Link Field")
                 .setDesc(defaultDescs["Structured Parser - Context Link Field"])
                 .addDropdown(dropdown => {
                 dropdown.addOption("", "Blank");
-                for (let field of availableFields) {
+                for (let field of exactCardOptions) {
                     dropdown.addOption(field, field);
                 }
-                dropdown.setValue(plugin.settings.Defaults["Structured Parser - Context Link Field"] || "");
+                dropdown.setValue(exactCardOptions.includes(selectedExactCard) ? selectedExactCard : "");
                 dropdown.onChange((value) => {
                     plugin.settings.Defaults["Structured Parser - Context Link Field"] = value;
                     plugin.saveAllData();
