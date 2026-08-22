@@ -885,7 +885,12 @@ class SettingsTab extends obsidian.PluginSettingTab {
             .join('\n');
     }
     getSectionTargetFields(plugin, availableFields) {
-        return availableFields || [];
+        const frontField = plugin.settings.Defaults["Structured Parser - Front Field"] || availableFields[0] || "";
+        const fileLinkField = plugin.settings.Defaults["Structured Parser - File Link Field"] || "";
+        const contextField = plugin.settings.Defaults["Structured Parser - Context Field"] || "";
+        const contextLinkField = plugin.settings.Defaults["Structured Parser - Context Link Field"] || "";
+        const reserved = new Set([frontField, fileLinkField, contextField, contextLinkField].filter(Boolean));
+        return (availableFields || []).filter(field => !reserved.has(field));
     }
     normalizeSectionFieldMap(raw, availableFields) {
         const allowed = new Set(this.getSectionTargetFields(this.plugin, availableFields));
@@ -2361,8 +2366,9 @@ function parseSectionFieldRules(raw) {
     }
     return rules;
 }
-function filterSectionRules(rules, availableFields) {
-    const allowed = new Set(availableFields);
+function filterSectionRules(rules, availableFields, frontField, fileLinkField, contextField, contextLinkField) {
+    const reserved = new Set([frontField, fileLinkField, contextField, contextLinkField].filter(Boolean));
+    const allowed = new Set(availableFields.filter(field => !reserved.has(field)));
     return rules.filter(rule => allowed.has(rule.field));
 }
 async function settingToData(app, settings, fields_dict) {
@@ -2445,7 +2451,7 @@ async function settingToData(app, settings, fields_dict) {
     const rawRules = settings.Defaults["Structured Parser - Section Field Map"] ?? "";
     const parsedRules = parseSectionFieldRules(rawRules);
     const availableNoteFields = fields_dict[result.structured_note_type] ?? [];
-    result.structured_section_rules = filterSectionRules(parsedRules, availableNoteFields);
+    result.structured_section_rules = filterSectionRules(parsedRules, availableNoteFields, result.structured_front_field, result.structured_file_link_field, result.structured_context_field, result.structured_context_link_field);
     result.structured_section_field_map = {};
     for (let rule of result.structured_section_rules) {
         result.structured_section_field_map[rule.label] = rule.field;

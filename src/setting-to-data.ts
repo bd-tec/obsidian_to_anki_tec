@@ -51,9 +51,14 @@ export function parseSectionFieldRules(raw: string): SectionRule[] {
 
 export function filterSectionRules(
     rules: SectionRule[],
-    availableFields: string[]
+    availableFields: string[],
+    frontField: string,
+    fileLinkField: string,
+    contextField: string,
+    contextLinkField: string
 ): SectionRule[] {
-    const allowed = new Set(availableFields)
+    const reserved = new Set([frontField, fileLinkField, contextField, contextLinkField].filter(Boolean))
+    const allowed = new Set(availableFields.filter(field => !reserved.has(field)))
     return rules.filter(rule => allowed.has(rule.field))
 }
 
@@ -68,9 +73,14 @@ function parseSectionFieldMap(raw: string): Record<string, string> {
 
 function filterSectionFieldMap(
     mapping: Record<string, string>,
-    availableFields: string[]
+    availableFields: string[],
+    frontField: string,
+    fileLinkField: string,
+    contextField: string,
+    contextLinkField: string
 ): Record<string, string> {
-    const allowed = new Set(availableFields)
+    const reserved = new Set([frontField, fileLinkField, contextField, contextLinkField].filter(Boolean))
+    const allowed = new Set(availableFields.filter(field => !reserved.has(field)))
     const filtered: Record<string, string> = {}
     for (let [label, field] of Object.entries(mapping)) {
         if (allowed.has(field)) {
@@ -165,7 +175,11 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     const availableNoteFields = fields_dict[result.structured_note_type] ?? []
     result.structured_section_rules = filterSectionRules(
         parsedRules,
-        availableNoteFields
+        availableNoteFields,
+        result.structured_front_field,
+        result.structured_file_link_field,
+        result.structured_context_field,
+        result.structured_context_link_field
     )
     result.structured_section_field_map = {}
     for (let rule of result.structured_section_rules) {

@@ -667,7 +667,12 @@ export class SettingsTab extends PluginSettingTab {
 	}
 
 	getSectionTargetFields(plugin: any, availableFields: string[]): string[] {
-		return availableFields || []
+		const frontField = plugin.settings.Defaults["Structured Parser - Front Field"] || availableFields[0] || ""
+		const fileLinkField = plugin.settings.Defaults["Structured Parser - File Link Field"] || ""
+		const contextField = plugin.settings.Defaults["Structured Parser - Context Field"] || ""
+		const contextLinkField = plugin.settings.Defaults["Structured Parser - Context Link Field"] || ""
+		const reserved = new Set([frontField, fileLinkField, contextField, contextLinkField].filter(Boolean))
+		return (availableFields || []).filter(field => !reserved.has(field))
 	}
 
 	normalizeSectionFieldMap(raw: string, availableFields: string[]): string {
