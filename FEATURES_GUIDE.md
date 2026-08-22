@@ -547,14 +547,43 @@ Usage:
 - rules are evaluated in top-to-bottom order; specific rules should be placed first, and remainder rules last
 - multiple rules routed to the same destination field automatically merge and append with clean spacing
 
-#### Capture Modes
+#### Capture Modes Explained
 
-| Mode | Behavior |
-|:---|:---|
-| `Until next section` | Default. Captures from the matching label until the next section heading. |
-| `Until line break` | Captures only the matching label's paragraph until the first blank line. Ideal for single-line answers like `**Ans:** T T F F F`. |
-| `Until card end` | Captures from the matching label all the way to the card end marker (`---`) or end of file. |
-| `Everything else (remainder)` | Catch-all. Captures all remaining content not claimed by earlier rules. Place as the final rule. |
+| Mode | Behavior | Best Used For |
+|:---|:---|:---|
+| `Until next section` | (Default) Captures from the matching label until the next heading (e.g. `**Next Heading:**`, `## Heading`, or another rule's label). Includes multi-line paragraphs and bullet lists within that section. | Multi-line sections (e.g. `**Explanation:**` with multiple bullet points). |
+| `Until line break` | Captures only the immediate paragraph until the first blank line (`\n\n`). | Single-line answers (e.g. `**Ans:** T T F F F`). |
+| `Until card end` | Captures everything from the label all the way to `---` (or end of file), ignoring any headings in between. | Final section spanning to the end of the card. |
+| `Everything else (remainder)` | Catch-all. Captures all remaining content not claimed by earlier rules. Place as the final rule. | Routing all leftover notes/explanations into `Extra`. |
+
+#### Visual Demo: How Each Mode Captures
+
+Given this card content:
+
+```md
+**Ans:** Intramuscular epinephrine.
+
+**Explanation:**
+- First-line treatment for anaphylaxis.
+- Administer in the anterolateral thigh.
+
+**Reference:**
+- Resuscitation Guideline 2024, Section 3.
+---
+```
+
+1. **`Until line break` on `Ans`** $\rightarrow$ Captures only the single answer line:
+   ```text
+   **Ans:** Intramuscular epinephrine.
+   ```
+2. **`Until next section` on `Explanation`** $\rightarrow$ Captures the heading and all its bullet points, stopping when the next heading (`**Reference:**`) starts:
+   ```text
+   **Explanation:**
+   - First-line treatment for anaphylaxis.
+   - Administer in the anterolateral thigh.
+   ```
+3. **`Until card end` on `Explanation`** $\rightarrow$ Captures everything from `**Explanation:**` down to `---` (including the Reference block).
+4. **`Everything else (remainder)` on `*`** $\rightarrow$ If `Ans` was claimed by Rule 1, this rule automatically catches both `Explanation` and `Reference` together!
 
 #### Example: Q&A with Answer line and Extra explanations
 
