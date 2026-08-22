@@ -902,12 +902,34 @@ class SettingsTab extends obsidian.PluginSettingTab {
             plugin.settings.Defaults["Structured Parser - Section Field Map"] = this.serializeSectionFieldMap(rules);
             plugin.saveAllData();
         };
+        // 1. Heading
+        wrapper.createEl('h3', {
+            text: "Section Field Map",
+            cls: 'anki-section-map-heading'
+        });
+        // 2. Description directly under the heading
+        const mainDesc = wrapper.createEl('div', {
+            cls: 'setting-item-description anki-section-map-main-desc'
+        });
+        mainDesc.createEl('div', {
+            text: "Route labeled sections to Anki fields. Rules are evaluated in order from top to bottom."
+        });
+        mainDesc.createEl('div', {
+            text: "• For specific sections (e.g. Ans, Explanation): Enter the label text to capture."
+        });
+        mainDesc.createEl('div', {
+            text: "• For catch-all remainder: Select 'Everything else (remainder)' or enter '*' as your final rule to capture all leftover content."
+        });
+        mainDesc.createEl('div', {
+            text: "• If no rules are added, the Back field keeps everything after the separator."
+        });
+        // 3. Add Rule Setting
         new obsidian.Setting(wrapper)
-            .setName("Section Field Map")
-            .setDesc("Route labeled sections to Anki fields. Rules are evaluated in order from top to bottom.")
+            .setName("Section Rules")
+            .setDesc("Add and configure routing rules for this note type.")
             .addButton(button => {
             button
-                .setButtonText("+")
+                .setButtonText("+ Add Rule")
                 .setTooltip("Add section rule")
                 .setDisabled(sectionTargetFields.length === 0)
                 .onClick(() => {
@@ -920,18 +942,7 @@ class SettingsTab extends obsidian.PluginSettingTab {
                 renderRules();
             });
         });
-        const mainDesc = wrapper.createEl('div', {
-            cls: 'setting-item-description anki-section-map-main-desc'
-        });
-        mainDesc.createEl('div', {
-            text: "• For specific sections (e.g. Ans, Explanation): Enter the label text to capture."
-        });
-        mainDesc.createEl('div', {
-            text: "• For catch-all remainder: Select 'Everything else (remainder)' or enter '*' as your final rule to capture all leftover content."
-        });
-        mainDesc.createEl('div', {
-            text: "• If no rules are added, the Back field keeps everything after the separator."
-        });
+        // 4. Rule list
         const listEl = wrapper.createDiv({ cls: "anki-section-map-rule-list" });
         const renderRules = () => {
             listEl.empty();

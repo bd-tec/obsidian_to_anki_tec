@@ -306,6 +306,16 @@ div + .anki-settings-header {
   min-width: 0;
 }
 
+.anki-section-map-heading {
+  margin-top: 24px;
+  margin-bottom: 6px;
+}
+
+.anki-section-map-main-desc {
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
 .anki-section-map-rule-list {
   display: grid;
   gap: 12px;
